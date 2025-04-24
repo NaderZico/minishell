@@ -1,32 +1,48 @@
-/* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   parser.c                                           :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/04/22 19:50:12 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/04/22 19:50:14 by nakhalil         ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
-
 #include "minishell.h"
 
 extern t_token *g_tokens;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers to build redirection and command structures
-// ─────────────────────────────────────────────────────────────────────────────
+/* ───────────────────────────────────────────────────────────────
+ * Helpers: t_cmd and t_redir constructors
+ * ─────────────────────────────────────────────────────────────── */
+static t_cmd	*new_cmd(void)
+{
+	t_cmd	*cmd = malloc(sizeof(t_cmd));
+	if (!cmd)
+		return (NULL);
+	cmd->argv = NULL;
+	cmd->redir = NULL;
+	cmd->infile = STDIN_FILENO;
+	cmd->outfile = STDOUT_FILENO;
+	cmd->pipe_fd[0] = -1;
+	cmd->pipe_fd[1] = -1;
+	cmd->pid = -1;
+	cmd->next = NULL;
+	return (cmd);
+}
+
+static void	add_cmd(t_cmd **cmd_list, t_cmd *new)
+{
+	if (!*cmd_list)
+		*cmd_list = new;
+	else
+	{
+		t_cmd *tmp = *cmd_list;
+		while (tmp->next)
+			tmp = tmp->next;
+		tmp->next = new;
+	}
+}
 
 static t_redir	*new_redir(int type, char *filename)
 {
-	t_redir *r = malloc(sizeof(t_redir));
-	if (!r)
+	t_redir *redir = malloc(sizeof(t_redir));
+	if (!redir)
 		return (NULL);
-	r->type = type;
-	r->filename = strdup(filename);
-	r->next = NULL;
-	return (r);
+	redir->type = type;
+	redir->filename = strdup(filename);
+	redir->next = NULL;
+	return (redir);
 }
 
 static void	add_redir(t_redir **redir_list, t_redir *new)
@@ -42,131 +58,98 @@ static void	add_redir(t_redir **redir_list, t_redir *new)
 	}
 }
 
-static t_cmd	*new_cmd(void)
-{
-	t_cmd *cmd = malloc(sizeof(t_cmd));
-	if (!cmd)
-		return (NULL);
-	cmd->argv = NULL;
-	cmd->redir = NULL;
-	cmd->next = NULL;
-	cmd->infile = STDIN_FILENO;
-	cmd->outfile = STDOUT_FILENO;
-	cmd->pipe_fd[0] = -1;
-	cmd->pipe_fd[1] = -1;
-	cmd->pid = -1;
-	return (cmd);
-}
-
-static void	add_cmd(t_cmd **cmd_list, t_cmd *new)
-{
-	if (!*cmd_list)
-		*cmd_list = new;
-	else
-	{
-		t_cmd *cur = *cmd_list;
-		while (cur->next)
-			cur = cur->next;
-		cur->next = new;
-	}
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Argument collection & counting
-// ─────────────────────────────────────────────────────────────────────────────
-
+/* ───────────────────────────────────────────────────────────────
+ * Count args and build argv[]
+ * ─────────────────────────────────────────────────────────────── */
 static int	count_args(t_token *tok)
 {
-	int count = 0;
+	int	count = 0;
 
 	while (tok && tok->type != TOK_PIPE)
 	{
 		if (tok->type == TOK_WORD)
 			count++;
 		else if (tok->type >= TOK_REDIR_IN && tok->type <= TOK_REDIR_HEREDOC)
-			tok = tok->next; // skip redir target
+			tok = tok->next;
 		tok = tok ? tok->next : NULL;
 	}
-	return count;
+	return (count);
 }
 
-static char	**collect_args(t_token **tok_ptr)
+static char	**build_argv(t_token *tok)
 {
-	int i = 0;
-	int argc = count_args(*tok_ptr);
-	char **argv = calloc(argc + 1, sizeof(char *));
+	int		i = 0;
+	int		argc = count_args(tok);
+	char	**argv = calloc(argc + 1, sizeof(char *));
 	if (!argv)
 		return (NULL);
 
-	while (*tok_ptr && (*tok_ptr)->type != TOK_PIPE)
+	while (tok && tok->type != TOK_PIPE)
 	{
-		if ((*tok_ptr)->type == TOK_WORD)
-		{
-			argv[i++] = strdup((*tok_ptr)->value);
-		}
-		else if ((*tok_ptr)->type >= TOK_REDIR_IN && (*tok_ptr)->type <= TOK_REDIR_HEREDOC)
-		{
-			*tok_ptr = (*tok_ptr)->next;
-			if (!*tok_ptr || (*tok_ptr)->type != TOK_WORD)
-			{
-				fprintf(stderr, "Syntax error near redirection\n");
-				return (NULL);
-			}
-		}
-		*tok_ptr = (*tok_ptr)->next;
+		if (tok->type == TOK_WORD)
+			argv[i++] = strdup(tok->value);
+		else if (tok->type >= TOK_REDIR_IN && tok->type <= TOK_REDIR_HEREDOC)
+			tok = tok->next;
+		tok = tok ? tok->next : NULL;
 	}
 	argv[i] = NULL;
-	return argv;
+	return (argv);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Parse one command (until pipe or end)
-// ─────────────────────────────────────────────────────────────────────────────
-
+/* ───────────────────────────────────────────────────────────────
+ * Parse one command: builds argv and redir
+ * Advances token pointer up to (and including) pipe if needed
+ * ─────────────────────────────────────────────────────────────── */
 static int	parse_command(t_cmd **cmd_list, t_token **tok)
 {
-	t_cmd *cmd = new_cmd();
+	t_cmd	*cmd;
+	t_token	*t;
+
+	if (!tok || !*tok)
+		return (0);
+	cmd = new_cmd();
 	if (!cmd)
 		return (0);
 
-	t_token *t = *tok;
-	cmd->argv = collect_args(&t);
+	cmd->argv = build_argv(*tok);
 	if (!cmd->argv)
 		return (0);
 
-	t = *tok; // reset to parse redirs again
+	// Parse redirections
+	t = *tok;
 	while (t && t->type != TOK_PIPE)
 	{
 		if (t->type >= TOK_REDIR_IN && t->type <= TOK_REDIR_HEREDOC)
 		{
-			int redir_type = t->type;
+			int	type = t->type;
 			t = t->next;
 			if (!t || t->type != TOK_WORD)
 			{
-				fprintf(stderr, "Missing filename after redirection\n");
+				fprintf(stderr, "Syntax error near redirection\n");
 				return (0);
 			}
-			add_redir(&cmd->redir, new_redir(redir_type, t->value));
+			add_redir(&cmd->redir, new_redir(type, t->value));
 		}
 		t = t ? t->next : NULL;
 	}
 
+	add_cmd(cmd_list, cmd);
+
+	// Advance *tok past the pipe (if any)
+	while (*tok && (*tok)->type != TOK_PIPE)
+		*tok = (*tok)->next;
 	if (*tok && (*tok)->type == TOK_PIPE)
 		*tok = (*tok)->next;
-	else
-		*tok = NULL;
 
-	add_cmd(cmd_list, cmd);
 	return (1);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main parser entry point
-// ─────────────────────────────────────────────────────────────────────────────
-
+/* ───────────────────────────────────────────────────────────────
+ * Main parser entry: builds full t_cmd list in shell->cmds
+ * ─────────────────────────────────────────────────────────────── */
 int	parser(t_shell *shell)
 {
-	t_token *cur = g_tokens;
+	t_token	*cur = g_tokens;
 
 	while (cur)
 	{

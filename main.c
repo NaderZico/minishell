@@ -1,8 +1,8 @@
 #include "minishell.h"
 
-// ───────────────────────────────────────────────────────────────
-// Temporary debug function to print tokens
-// ───────────────────────────────────────────────────────────────
+/* ───────────────────────────────────────────────────────────────
+ * Print all parsed tokens (for debugging)
+ * ─────────────────────────────────────────────────────────────── */
 void	print_tokens(t_token *t)
 {
 	while (t)
@@ -12,6 +12,68 @@ void	print_tokens(t_token *t)
 	}
 }
 
+/* ───────────────────────────────────────────────────────────────
+ * Print parsed commands (for parser testing)
+ * ─────────────────────────────────────────────────────────────── */
+void	print_cmds(t_cmd *cmd)
+{
+	int	i;
+
+	while (cmd)
+	{
+		printf("CMD:\n");
+		i = 0;
+		while (cmd->argv && cmd->argv[i])
+		{
+			printf("  argv[%d] = [%s]\n", i, cmd->argv[i]);
+			i++;
+		}
+		t_redir *r = cmd->redir;
+		while (r)
+		{
+			printf("  redir: type=%d -> [%s]\n", r->type, r->filename);
+			r = r->next;
+		}
+		cmd = cmd->next;
+	}
+}
+
+/* ───────────────────────────────────────────────────────────────
+ * Free everything after each loop
+ * ─────────────────────────────────────────────────────────────── */
+void	free_redirs(t_redir *r)
+{
+	t_redir *tmp;
+
+	while (r)
+	{
+		tmp = r->next;
+		free(r->filename);
+		free(r);
+		r = tmp;
+	}
+}
+
+void	free_cmds(t_cmd *cmd)
+{
+	t_cmd *tmp;
+	int		i;
+
+	while (cmd)
+	{
+		tmp = cmd->next;
+		if (cmd->argv)
+		{
+			i = 0;
+			while (cmd->argv[i])
+				free(cmd->argv[i++]);
+			free(cmd->argv);
+		}
+		free_redirs(cmd->redir);
+		free(cmd);
+		cmd = tmp;
+	}
+}
 
 void	free_token_list(t_token *tokens)
 {
@@ -26,36 +88,30 @@ void	free_token_list(t_token *tokens)
 	}
 }
 
-// ───────────────────────────────────────────────────────────────
-// Free input line and tokens between loops
-// ───────────────────────────────────────────────────────────────
 void	free_all(t_shell *shell)
 {
-	if (shell->line)
-	{
-		free(shell->line);
-		shell->line = NULL;
-	}
-	if (g_tokens)
-	{
-		free_token_list(g_tokens);
-		g_tokens = NULL;
-	}
+	free(shell->line);
+	free_cmds(shell->cmds);
+	free_token_list(g_tokens);
+	shell->line = NULL;
+	shell->cmds = NULL;
+	g_tokens = NULL;
 }
 
-// ───────────────────────────────────────────────────────────────
-// Main REPL loop
-// ───────────────────────────────────────────────────────────────
+/* ───────────────────────────────────────────────────────────────
+ * REPL loop for testing lexer and parser
+ * ─────────────────────────────────────────────────────────────── */
 int	main(void)
 {
 	t_shell	shell;
 
 	shell.line = NULL;
+	shell.cmds = NULL;
 
 	while (1)
 	{
 		shell.line = readline("minishell$ ");
-		if (!shell.line) // Ctrl-D or EOF
+		if (!shell.line)
 		{
 			printf("exit\n");
 			break;
@@ -63,7 +119,10 @@ int	main(void)
 		if (*shell.line)
 			add_history(shell.line);
 		if (lexer(&shell))
-			print_tokens(g_tokens);
+		{
+			if (parser(&shell))
+				print_cmds(shell.cmds);
+		}
 		free_all(&shell);
 	}
 	return (0);
