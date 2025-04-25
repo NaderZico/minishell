@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/22 17:52:08 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/04/24 13:35:50 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/04/25 19:32:46 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,6 +23,7 @@
 # include <signal.h>
 # include <readline/readline.h>
 # include <readline/history.h>
+# include "libft/libft.h"
 
 /* ── TOKEN TYPES ─────────────────────────────────────────────────────────── */
 typedef enum e_tok_type
@@ -88,5 +89,8 @@ int		parser(t_shell *shell);
 void	free_all(t_shell *shell);
 void	print_tokens(t_token *t); // for debugging (optional)
 void	print_cmds(t_cmd *cmd);   // for debugging (optional)
+
+void	init_signals(void);
+void	set_child_signals(void);
 
 #endif

@@ -108,6 +108,7 @@ int	main(void)
 	shell.line = NULL;
 	shell.cmds = NULL;
 
+	init_signals();
 	while (1)
 	{
 		shell.line = readline("minishell$ ");

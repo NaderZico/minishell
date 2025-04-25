@@ -6,7 +6,7 @@
 #    By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/04/23 15:41:33 by nakhalil          #+#    #+#              #
-#    Updated: 2025/04/24 13:33:39 by nakhalil         ###   ########.fr        #
+#    Updated: 2025/04/25 20:33:24 by nakhalil         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -17,7 +17,7 @@ CC = cc
 CFLAGS = -Wall -Wextra -Werror
 
 # Source files
-SRCS = main.c lexer.c parser.c
+SRCS = main.c lexer.c parser.c signals.c
 
 # Object files
 OBJS = $(SRCS:.c=.o)
@@ -26,7 +26,7 @@ OBJS = $(SRCS:.c=.o)
 INCLUDES = -I. -I./libft
 
 # Libraries
-LIBS = -lreadline -L./libft -lft
+LIBS = -L./libft -lft -lreadline -I.brew/opt/readline/include -L/opt/vagrant/embedded/lib -lreadline
 
 # Libft
 LIBFT_DIR = ./libft
