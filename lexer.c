@@ -1,116 +1,155 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   lexer.c                                            :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2025/04/27 15:12:33 by nakhalil          #+#    #+#             */
+/*   Updated: 2025/04/29 19:12:36 by nakhalil         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "minishell.h"
 
-t_token	*g_tokens = NULL;
-
-static t_token	*new_token(char *value, t_tok_type type)
+/**
+ * ft_isspace
+ *   Returns true if c is any standard ASCII whitespace.
+ */
+static int ft_isspace(char c)
 {
-	t_token	*tok = malloc(sizeof(t_token));
-	if (!tok)
-		return (NULL);
-	tok->value = value;
-	tok->type = type;
-	tok->next = NULL;
-	return (tok);
+    return (c == ' ' || c == '\t' || c == '\n'
+         || c == '\v' || c == '\f' || c == '\r');
 }
 
-static void	add_token(t_token **tokens, t_token *new)
+/**
+ * quote_type_to_char
+ *   Converts our t_quote enum into its literal delimiter (\' or \").
+ */
+static char quote_type_to_char(t_quote type)
 {
-	if (!*tokens)
-		*tokens = new;
-	else
-	{
-		t_token *tmp = *tokens;
-		while (tmp->next)
-			tmp = tmp->next;
-		tmp->next = new;
-	}
+    if (type == SINGLE_QUOTE) return '\'';
+    if (type == DOUBLE_QUOTE) return '"';
+    return 0;
 }
 
-static t_token *parse_operator(char *line, int *i)
+/**
+ * update_quote_state
+ *   Toggles or maintains quote state when seeing ' or ".
+ *   Ensures that nested/unmatched quotes are tracked.
+ */
+static t_quote update_quote_state(t_quote current, char c)
 {
-	int			start = *i;
-	t_tok_type	type;
-
-	if (line[*i] == '<' && line[*i + 1] == '<')
-	{
-		*i += 2;
-		type = TOK_REDIR_HEREDOC;
-	}
-	else if (line[*i] == '>' && line[*i + 1] == '>')
-	{
-		*i += 2;
-		type = TOK_REDIR_APPEND;
-	}
-	else if (line[*i] == '>')
-	{
-		*i += 1;
-		type = TOK_REDIR_OUT;
-	}
-	else if (line[*i] == '<')
-	{
-		*i += 1;
-		type = TOK_REDIR_IN;
-	}
-	else // '|'
-	{
-		*i += 1;
-		type = TOK_PIPE;
-	}
-	return new_token(strndup(&line[start], *i - start), type);
+    if (c == '\'')
+        return (current == SINGLE_QUOTE) ? NO_QUOTE : SINGLE_QUOTE;
+    if (c == '"')
+        return (current == DOUBLE_QUOTE) ? NO_QUOTE : DOUBLE_QUOTE;
+    return current;
 }
 
-static t_token *parse_word(char *line, int *i)
+/**
+ * handle_quotes
+ *   Called when lexer sees ' or ".  Grabs everything up to the matching
+ *   delimiter (or errors out on unterminated), produces one WORD token
+ *   with quote=SINGLE_QUOTE or DOUBLE_QUOTE.
+ */
+static void handle_quotes(char *input, int *i, t_data *data)
 {
-	int		start = *i;
-	int		j = *i;
-	char	quote = 0;
+    t_quote quote_type = (input[*i] == '\'') ? SINGLE_QUOTE : DOUBLE_QUOTE;
+    int start = ++(*i);
 
-	while (line[j] && !(line[j] == ' ' || line[j] == '\t' || line[j] == '|' || line[j] == '<' || line[j] == '>'))
-	{
-		if (!quote && (line[j] == '\'' || line[j] == '"'))
-		{
-			quote = line[j++];
-			while (line[j] && line[j] != quote)
-				j++;
-			if (line[j] == quote)
-				j++;
-			quote = 0;
-		}
-		else
-			j++;
-	}
-	*i = j;
-	return new_token(strndup(&line[start], j - start), TOK_WORD);
+    /* advance until matching ' or " */
+    while (input[*i] && input[*i] != quote_type_to_char(quote_type))
+        (*i)++;
+
+    char *value = ft_substr(input, start, *i - start);
+    if (input[*i])
+        (*i)++;
+    else
+    {
+        ft_putstr_fd("minishell: unterminated quote\n", 2);
+        free(value);
+        return;
+    }
+
+    data->tokens[data->token_count++] = (t_token){
+        .value = value,
+        .type  = WORD,
+        .quote = quote_type
+    };
 }
 
-t_token	*tokenize(char *line)
+/**
+ * handle_redir_pipe
+ *   Called when lexer sees one of |, <, <<, >, >>.
+ *   Emits a token of type PIPE/REDIR_* with NULL value.
+ */
+static void handle_redir_pipe(char *input, int *i, t_data *data)
 {
-	t_token *tokens = NULL;
-	t_token *new = NULL;
-	int i = 0;
+    t_token_type type;
 
-	while (line[i])
-	{
-		while (line[i] && (line[i] == ' ' || line[i] == '\t'))
-			i++;
+    if (input[*i] == '|')
+        type = PIPE, (*i)++;
+    else if (input[*i] == '<' && input[*i + 1] == '<')
+        type = REDIR_HEREDOC, (*i) += 2;
+    else if (input[*i] == '<')
+        type = REDIR_IN, (*i)++;
+    else if (input[*i] == '>' && input[*i + 1] == '>')
+        type = REDIR_APPEND, (*i) += 2;
+    else /* must be single > */
+        type = REDIR_OUT, (*i)++;
 
-		if (!line[i])
-			break;
-
-		if (line[i] == '|' || line[i] == '<' || line[i] == '>')
-			new = parse_operator(line, &i);
-		else
-			new = parse_word(line, &i);
-
-		if (!new)
-			return (free_token_list(tokens), NULL);
-		add_token(&tokens, new);
-	}
-	return (tokens);
+    data->tokens[data->token_count++] = (t_token){NULL, type, NO_QUOTE};
 }
 
-int	lexer(t_shell *shell)
+/**
+ * handle_word
+ *   Grabs an unquoted “word” (including embedded quotes) up until whitespace
+ *   or one of the special chars.  Emits a WORD token with quote=NO_QUOTE.
+ */
+static void handle_word(char *input, int *i, t_data *data)
 {
-	g_tokens = tokenize(shell->line);
-	return (g_tokens != NULL);
+    int start = *i;
+    t_quote current_quote = NO_QUOTE;
+
+    while (input[*i]
+       && (current_quote != NO_QUOTE
+        || !ft_strchr(" |<>\"\'", input[*i])))
+    {
+        if (input[*i] == '\'' || input[*i] == '"')
+            current_quote = update_quote_state(current_quote, input[*i]);
+        (*i)++;
+    }
+
+    char *value = ft_substr(input, start, *i - start);
+    data->tokens[data->token_count++] = (t_token){
+        .value = value,
+        .type  = WORD,
+        .quote = NO_QUOTE
+    };
+}
+
+/**
+ * tokenize_input
+ *   Top‐level lexer: splits `input` into tokens[] up to MAX_TOKENS.
+ *   Returns 0 on success (we don’t use the return code for errors here).
+ */
+int tokenize_input(char *input, t_data *data)
+{
+    int i = 0;
+    data->token_count = 0;
+
+    while (input[i] && data->token_count < MAX_TOKENS - 1)
+    {
+        while (ft_isspace(input[i])) i++;
+        if (!input[i]) break;
+
+        if (input[i] == '|' || input[i] == '<' || input[i] == '>')
+            handle_redir_pipe(input, &i, data);
+        else if (input[i] == '\'' || input[i] == '"')
+            handle_quotes(input, &i, data);
+        else
+            handle_word(input, &i, data);
+    }
+    return 0;
 }

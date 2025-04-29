@@ -6,203 +6,101 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/24 17:55:32 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/04/25 18:24:37 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/04/29 19:10:31 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "minishell.h"
 
-/*
-** Allocates and initializes a new command node (t_cmd).
-** Sets default values for pipe and redirection fields.
-*/
-static t_cmd	*new_cmd(void)
+/**
+ * Adds a redirection to the current command.
+ *
+ * This function reallocates the command's redirection array to accommodate
+ * a new redirection, copies existing redirections into the new array,
+ * appends the new redirection (based on the current token and the next one),
+ * and updates the command's redirection count.
+ *
+ * @param cmd   Pointer to the current command being populated.
+ * @param data  Pointer to the main shell data structure containing tokens.
+ * @param i     Pointer to the current token index. This will be advanced by 2.
+ * @return      Always returns 0.
+ */
+static int	add_redirection(t_command *cmd, t_data *data, int *i)
 {
-	t_cmd	*cmd;
+	t_redir	*new_redirs;
+	int		j;
 
-	cmd = (t_cmd *)ft_calloc(1, sizeof(t_cmd));
-	if (!cmd)
-		return (NULL);
-	cmd->infile = STDIN_FILENO;
-	cmd->outfile = STDOUT_FILENO;
-	cmd->pipe_fd[0] = -1;
-	cmd->pipe_fd[1] = -1;
-	cmd->pid = -1;
-	cmd->next = NULL;
-	return (cmd);
+	// Allocate space for one more redirection.
+	new_redirs = safe_malloc(sizeof(t_redir) * (cmd->redir_count + 1));
+
+	// Copy existing redirections into the new array.
+	j = -1;
+	while (++j < cmd->redir_count)
+		new_redirs[j] = cmd->redirs[j];
+
+	// Add the new redirection (type and target file).
+	new_redirs[cmd->redir_count].type = data->tokens[*i].type;
+	new_redirs[cmd->redir_count].file = ft_strdup(data->tokens[*i + 1].value);
+
+	// Replace the old redirection array with the new one.
+	free(cmd->redirs);
+	cmd->redirs = new_redirs;
+	cmd->redir_count++;
+
+	// Skip over redirection token and its target.
+	*i += 2;
+	return (0);
 }
 
-/*
-** Adds a t_cmd node to the end of the command list.
-*/
-static void	add_cmd(t_cmd **cmd_list, t_cmd *new)
+/**
+ * Parses the list of tokens into an array of command structures.
+ *
+ * This function reads the tokens, splits them into commands (based on PIPE tokens),
+ * adds redirections when detected, and collects arguments.
+ *
+ * All parsed commands and their data are stored in `data->commands`,
+ * and the total number of parsed commands is stored in `data->cmd_count`.
+ *
+ * @param data  Pointer to the main shell data structure containing tokens.
+ * @return      Always returns 0.
+ */
+int	parse_tokens(t_data *data)
 {
-	t_cmd	*tmp;
+	int	cmd_idx = 0;
+	int	i = 0;
 
-	if (!*cmd_list)
-		*cmd_list = new;
-	else
+	data->cmd_count = 0;
+
+	// Loop through all tokens, breaking at each PIPE to form new commands.
+	while (i < data->token_count && cmd_idx < MAX_COMMANDS)
 	{
-		tmp = *cmd_list;
-		while (tmp->next)
-			tmp = tmp->next;
-		tmp->next = new;
-	}
-}
+		// Initialize the current command.
+		data->commands[cmd_idx].args = NULL;
+		data->commands[cmd_idx].redirs = NULL;
+		data->commands[cmd_idx].redir_count = 0;
 
-/*
-** Allocates a redirection node (t_redir) for a given type and filename.
-** Returns NULL on allocation failure.
-*/
-static t_redir	*new_redir(int type, char *filename)
-{
-	t_redir	*redir;
-
-	redir = (t_redir *)ft_calloc(1, sizeof(t_redir));
-	if (!redir)
-		return (NULL);
-	redir->type = type;
-	redir->filename = ft_strdup(filename);
-	if (!redir->filename)
-	{
-		free(redir);
-		return (NULL);
-	}
-	redir->next = NULL;
-	return (redir);
-}
-
-/*
-** Appends a redirection node to the end of a command’s redirection list.
-*/
-static void	add_redir(t_redir **redir_list, t_redir *new)
-{
-	t_redir	*tmp;
-
-	if (!*redir_list)
-		*redir_list = new;
-	else
-	{
-		tmp = *redir_list;
-		while (tmp->next)
-			tmp = tmp->next;
-		tmp->next = new;
-	}
-}
-
-/*
-** Counts the number of arguments (TOK_WORD tokens) before the next pipe.
-** Skips redirection operators and filenames.
-*/
-static int	count_args(t_token *tok)
-{
-	int	count;
-
-	count = 0;
-	while (tok && tok->type != TOK_PIPE)
-	{
-		if (tok->type == TOK_WORD)
-			count++;
-		else if (tok->type >= TOK_REDIR_IN && tok->type <= TOK_REDIR_HEREDOC)
-			tok = tok->next;
-		if (tok)
-			tok = tok->next;
-	}
-	return (count);
-}
-
-/*
-** Builds the argv array for the current command.
-** Only includes TOK_WORD tokens, skipping redirection operators and filenames.
-*/
-static char	**build_argv(t_token *tok)
-{
-	int		argc;
-	char	**argv;
-	int		i;
-
-	argc = count_args(tok);
-	argv = (char **)ft_calloc(argc + 1, sizeof(char *));
-	if (!argv)
-		return (NULL);
-	i = 0;
-	while (tok && tok->type != TOK_PIPE)
-	{
-		if (tok->type == TOK_WORD)
-			argv[i++] = ft_strdup(tok->value);
-		else if (tok->type >= TOK_REDIR_IN && tok->type <= TOK_REDIR_HEREDOC)
-			tok = tok->next;
-		if (tok)
-			tok = tok->next;
-	}
-	argv[i] = NULL;
-	return (argv);
-}
-
-/*
-** Parses one command segment:
-** - Builds argv from TOK_WORD tokens
-** - Collects redirections and appends to the command
-** - Adds the command to the pipeline list
-** - Advances token pointer past the pipe (if present)
-*/
-static int	parse_command(t_cmd **cmd_list, t_token **tok)
-{
-	t_cmd	*cmd;
-	t_token	*t;
-	t_redir	*redir;
-
-	cmd = new_cmd();
-	if (!cmd)
-		return (0);
-	cmd->argv = build_argv(*tok);
-	if (!cmd->argv)
-	{
-		free(cmd);
-		return (0);
-	}
-	t = *tok;
-	while (t && t->type != TOK_PIPE)
-	{
-		if (t->type >= TOK_REDIR_IN && t->type <= TOK_REDIR_HEREDOC)
+		// Parse the tokens for the current command until a PIPE or end is reached.
+		while (i < data->token_count && data->tokens[i].type != PIPE)
 		{
-			int	type = t->type;
-			t = t->next;
-			if (!t || t->type != TOK_WORD)
+			// Handle redirection token and target.
+			if (data->tokens[i].type >= REDIR_IN)
+				add_redirection(&data->commands[cmd_idx], data, &i);
+			else
 			{
-				ft_putstr_fd("Syntax error near redirection\n", STDERR_FILENO);
-				return (0);
+				// Add token to argument list.
+				data->commands[cmd_idx].args = ft_extend_arr(
+					data->commands[cmd_idx].args, data->tokens[i++].value);
 			}
-			redir = new_redir(type, t->value);
-			if (!redir)
-				return (0);
-			add_redir(&cmd->redir, redir);
 		}
-		if (t)
-			t = t->next;
-	}
-	add_cmd(cmd_list, cmd);
-	while (*tok && (*tok)->type != TOK_PIPE)
-		*tok = (*tok)->next;
-	if (*tok && (*tok)->type == TOK_PIPE)
-		*tok = (*tok)->next;
-	return (1);
-}
 
-/*
-** Entry point of the parser.
-** Iterates through all tokens and builds a linked list of t_cmd nodes
-** for execution (one per command or pipe segment).
-*/
-int	parser(t_shell *shell)
-{
-	t_token	*curr;
+		// Skip the PIPE token if present.
+		if (i < data->token_count && data->tokens[i].type == PIPE)
+			i++;
 
-	curr = g_tokens;
-	while (curr)
-	{
-		if (!parse_command(&shell->cmds, &curr))
-			return (0);
+		// Move to the next command slot.
+		cmd_idx++;
 	}
-	return (1);
+
+	data->cmd_count = cmd_idx;
+	return (0);
 }

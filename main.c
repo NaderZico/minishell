@@ -1,130 +1,136 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   main.c                                             :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2025/04/27 14:53:55 by nakhalil          #+#    #+#             */
+/*   Updated: 2025/04/29 19:27:09 by nakhalil         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "minishell.h"
 
-/* ───────────────────────────────────────────────────────────────
- * Print all parsed tokens (for debugging)
- * ─────────────────────────────────────────────────────────────── */
-void	print_tokens(t_token *t)
+// int main(int argc, char **argv, char **envp)
+// {
+//     t_data  data = {
+//         .token_count = 0,
+//         .cmd_count = 0,
+//         .env = envp,
+//         .last_status = 0
+//     };
+//     char    *input;
+
+//     (void)argc;
+//     (void)argv;
+//     setup_signals();
+//     while (1)
+//     {
+//         input = readline("minishell> ");
+//         if (!input)
+//         {
+//             write(1, "exit\n", 5);
+//             break;
+//         }
+//         if (*input)
+//         {
+//             add_history(input);
+//             if (tokenize_input(input, &data) == 0 && validate_syntax(&data))
+//             {
+//                 expand_tokens(&data);
+//                 parse_tokens(&data);
+//             }
+//             free(input);
+//             free_data(&data);
+//         }
+//     }
+//     return (0);
+// }
+
+/**
+ * Print out all tokens for inspection.
+//  */
+// static void debug_print_tokens(t_data *data)
+// {
+//     printf("→ [debug] token_count = %d\n", data->token_count);
+//     for (int i = 0; i < data->token_count; i++)
+//     {
+//         t_token *tok = &data->tokens[i];
+//         printf("   token[%d]: type=%d, quote=%d, value=\"%s\"\n",
+//                i, tok->type, tok->quote, tok->value);
+//     }
+// }
+
+/**
+ * Print out all parsed commands, their args and redirections.
+ */
+// static void debug_print_commands(t_data *data)
+// {
+//     printf("→ [debug] cmd_count   = %d\n", data->cmd_count);
+//     for (int c = 0; c < data->cmd_count; c++)
+//     {
+//         t_command *cmd = &data->commands[c];
+//         printf("   command[%d]:\n", c);
+
+//         if (cmd->args)
+//         {
+//             for (int j = 0; cmd->args[j]; j++)
+//                 printf("      arg[%d] = \"%s\"\n", j, cmd->args[j]);
+//         }
+//         else
+//             printf("      (no args)\n");
+
+//         for (int r = 0; r < cmd->redir_count; r++)
+//         {
+//             printf("      redir[%d]: type=%d, file=\"%s\"\n",
+//                    r, cmd->redirs[r].type, cmd->redirs[r].file);
+//         }
+//     }
+// }
+
+int main(int argc, char **argv, char **envp)
 {
-	while (t)
-	{
-		printf("TOKEN: [%s] type=%d\n", t->value, t->type);
-		t = t->next;
-	}
-}
+    t_data  data = {
+        .token_count = 0,
+        .cmd_count   = 0,
+        .env         = envp,
+        .last_status = 0
+    };
+    char    *input;
 
-/* ───────────────────────────────────────────────────────────────
- * Print parsed commands (for parser testing)
- * ─────────────────────────────────────────────────────────────── */
-void	print_cmds(t_cmd *cmd)
-{
-	int	i;
+    (void)argc;
+    (void)argv;
+    setup_signals();
 
-	while (cmd)
-	{
-		printf("CMD:\n");
-		i = 0;
-		while (cmd->argv && cmd->argv[i])
-		{
-			printf("  argv[%d] = [%s]\n", i, cmd->argv[i]);
-			i++;
-		}
-		t_redir *r = cmd->redir;
-		while (r)
-		{
-			printf("  redir: type=%d -> [%s]\n", r->type, r->filename);
-			r = r->next;
-		}
-		cmd = cmd->next;
-	}
-}
+    while (1)
+    {
+        input = readline("minishell> ");
+        if (!input)
+        {
+            write(1, "exit\n", 5);
+            break;
+        }
 
-/* ───────────────────────────────────────────────────────────────
- * Free everything after each loop
- * ─────────────────────────────────────────────────────────────── */
-void	free_redirs(t_redir *r)
-{
-	t_redir *tmp;
+        if (*input)
+        {
+            add_history(input);
+            if (tokenize_input(input, &data) == 0
+                && validate_syntax(&data))
+            {
+                // Debug dump: raw tokens
+                // debug_print_tokens(&data);
 
-	while (r)
-	{
-		tmp = r->next;
-		free(r->filename);
-		free(r);
-		r = tmp;
-	}
-}
+                // Expand $vars, then parse into commands
+                expand_tokens(&data);
+                parse_tokens(&data);
 
-void	free_cmds(t_cmd *cmd)
-{
-	t_cmd *tmp;
-	int		i;
-
-	while (cmd)
-	{
-		tmp = cmd->next;
-		if (cmd->argv)
-		{
-			i = 0;
-			while (cmd->argv[i])
-				free(cmd->argv[i++]);
-			free(cmd->argv);
-		}
-		free_redirs(cmd->redir);
-		free(cmd);
-		cmd = tmp;
-	}
-}
-
-void	free_token_list(t_token *tokens)
-{
-	t_token *tmp;
-
-	while (tokens)
-	{
-		tmp = tokens->next;
-		free(tokens->value);
-		free(tokens);
-		tokens = tmp;
-	}
-}
-
-void	free_all(t_shell *shell)
-{
-	free(shell->line);
-	free_cmds(shell->cmds);
-	free_token_list(g_tokens);
-	shell->line = NULL;
-	shell->cmds = NULL;
-	g_tokens = NULL;
-}
-
-/* ───────────────────────────────────────────────────────────────
- * REPL loop for testing lexer and parser
- * ─────────────────────────────────────────────────────────────── */
-int	main(void)
-{
-	t_shell	shell;
-
-	shell.line = NULL;
-	shell.cmds = NULL;
-
-	init_signals();
-	while (1)
-	{
-		shell.line = readline("minishell$ ");
-		if (!shell.line)
-		{
-			printf("exit\n");
-			break;
-		}
-		if (*shell.line)
-			add_history(shell.line);
-		if (lexer(&shell))
-		{
-			if (parser(&shell))
-				print_cmds(shell.cmds);
-		}
-		free_all(&shell);
-	}
-	return (0);
+                // Debug dump: parsed commands/redirects
+                // debug_print_commands(&data);
+            }
+            free(input);
+            free_data(&data);
+        }
+    }
+    return (0);
 }
