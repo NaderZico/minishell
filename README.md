@@ -56,7 +56,7 @@ Flow diagram visualizing the relationship between the structs
 
 Detailed Struct Relationships:
 1. t_data is the root container:
-   - Contains ALL tokens from lexing phase
+   - Contains ALL tokens from tokenization phase
    - Contains ALL commands from parsing phase
    - Maintains environment and exit status
 
