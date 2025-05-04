@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/22 17:52:08 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/04/29 19:30:35 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/05/04 15:27:26 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -108,7 +108,7 @@ typedef struct s_command
 /*
  * s_data
  *   Top‐level “session” state, passed around during one REPL iteration:
- *     tokens      — lexed tokens[MAX_TOKENS]
+ *     tokens      — tokenized tokens[MAX_TOKENS]
  *     token_count — actual number of tokens
  *     commands    — parsed commands[MAX_COMMANDS]
  *     cmd_count   — actual number of commands

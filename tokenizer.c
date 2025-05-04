@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/27 15:12:33 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/04/29 19:12:36 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/05/04 15:00:47 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -41,10 +41,21 @@ static char quote_type_to_char(t_quote type)
 static t_quote update_quote_state(t_quote current, char c)
 {
     if (c == '\'')
-        return (current == SINGLE_QUOTE) ? NO_QUOTE : SINGLE_QUOTE;
-    if (c == '"')
-        return (current == DOUBLE_QUOTE) ? NO_QUOTE : DOUBLE_QUOTE;
-    return current;
+    {
+        if (current == SINGLE_QUOTE)
+            return NO_QUOTE;
+        else
+            return SINGLE_QUOTE;
+    }
+    else if (c == '"')
+    {
+        if (current == DOUBLE_QUOTE)
+            return NO_QUOTE;
+        else
+            return DOUBLE_QUOTE;
+    }
+    else
+        return current;
 }
 
 /**
