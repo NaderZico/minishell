@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/27 14:53:55 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/04 13:59:50 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/05/04 18:16:24 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -77,14 +77,14 @@ int main(int argc, char **argv, char **envp)
                 && validate_syntax(&data))
             {
                 // Debug dump: raw tokens
-                debug_print_tokens(&data);
+                // debug_print_tokens(&data);
 
                 // Expand $vars, then parse into commands
                 expand_tokens(&data);
                 parse_tokens(&data);
 
                 // Debug dump: parsed commands/redirects
-                debug_print_commands(&data);
+                // debug_print_commands(&data);
             }
             free(input);
             free_data(&data);
