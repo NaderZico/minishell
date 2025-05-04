@@ -1,3 +1,4 @@
+<pre markdown="1">
 Flow diagram visualizing the relationship between the structs
 
                  1. Parsing
@@ -161,3 +162,4 @@ Example
         │ │ - execve("/bin/ls", args)       │ │ - dup2(fd, STDOUT) │
         │ └───────────────┘ │               │ │ - execve("/bin/grep", args) │
         └───────────────────┘               └───────────────────┘
+</pre>
