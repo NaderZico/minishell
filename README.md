@@ -54,62 +54,42 @@
                                                 ┌──────────┐    back to
                                                 │ free_all │    readline
                                                 └──────────┘
+------------------------------------------------------------------------------------
 
+Flow diagram visualizing the relationship between the parsing and execution
 
-Flow diagram visualizing the relationship between the structs
-
-                 1. Tokenization and Parsing
-┌───────────────────────────────────────────────────┐
-│                      t_data                       │
-│ ┌───────────────────────────────────────────────┐ │
-│ │ tokens: t_token[MAX_TOKENS]                   │ │
-│ │ token_count: int                              │ │
-│ │ commands: t_command[MAX_COMMANDS]             │ │
-│ │ cmd_count: int                                │ │
-│ │ env: char**                                   │ │
-│ │ last_status: int                              │ │
-│ └───────────────────────────────────────────────┘ │
-└───────────────────────────────────────────────────┘
-            │
-            ├───────────────────────────────┐
-            ▼                               ▼
-┌───────────────────────┐       ┌─────────────────────────┐
-│       t_token         │       │       t_command         │
-│ ┌───────────────────┐ │       │ ┌─────────────────────┐ │
-│ │ value: char*      │ │       │ │ args: char**        │ │◄──┐
-│ │ type: token_type  │ │       │ │ redirs: t_redir*    │ │   │
-│ │ quote: t_quote    │ │       │ │ redir_count: int    │ │   │
-│ └───────────────────┘ │       │ │ pipe_in: int        │ │   │
-└───────────────────────┘       │ │ pipe_out: int       │ │   │
-            ▲                   └─────────────────────┘ │     │
-            │                       │                   │     │
-            │                       ├───────────────────┘     │
-            │                       ▼                         │
-            │               ┌─────────────────┐               │
-            │               │    t_redir      │               │
-            │               │ ┌─────────────┐ │               │
-            │               │ │ file: char* │ │               │
-            │               │ │ type: int   │ │               │
-            │               │ └─────────────┘ │               │
-            │               └─────────────────┘               │
-            │                                                 │
-            │                                                 │
-            └─────────────────────────────────────────────────┘
-                         2. Execution (later)
-                               │
-                ┌──────────────┴──────────────┐
-                ▼                             ▼
-┌───────────────────────────────┐  ┌───────────────────────────────┐
-│        Command Execution      │  │       Redirection Handling    │
-│                               │  │                               │
-│ ► For each t_command:         │  │ ► For each t_redir in command:│
-│   - fork()                    │  │   - open()/pipe()             │
-│   - if child:                 │  │   - dup2() to redirect        │
-│     • dup2(pipe_in, STDIN)    │  │     stdin/stdout              │
-│     • dup2(pipe_out, STDOUT)  │  │                               │
-│     • execve(args[0], args)   │  │ ► Heredocs create temp files  │
-│                               │  │                               │
-└───────────────────────────────┘  └───────────────────────────────┘
+            1. struct contains parsed data required for the execution
+                       ┌──────────────────────────────┐
+                       │           t_data             │
+                       ├──────────────────────────────┤
+                       │ tokens:    t_token[MAX_TOKENS] │
+                       │ token_count: int             │
+                       │                              │
+                       │ commands:  t_command[MAX_CMD]│◀─── populated by parser()
+                       │ cmd_count:  int              │
+                       │                              │
+                       │ env:       char **           │
+                       │ last_status: int             │
+                       └──────────────────────────────┘
+                                      │
+                                      ▼
+                              (pass pointer to)
+                                      │
+            2. *prototype* struct to handle execution of the parsed commands
+                       ┌──────────────────────────────┐
+                       │         t_executor           │
+                       ├──────────────────────────────┤
+                       │ • commands: t_command *      │◄── from t_data.commands
+                       │ • cmd_count:  int            │◄── from t_data.cmd_count
+                       │ • env:        char **        │◄── from t_data.env
+                       │ • last_status: int           │◄── from t_data.last_status
+                       │ • pipes:      int (*)[2]     │
+                       │ • pids:       pid_t *        │
+                       └──────────────────────────────┘
+                                      │
+                                      ▼
+                       executor() loops over commands[]
+                       and uses each t_command.redirs[] internally
 
 Detailed Struct Relationships:
 1. t_data is the root container:
