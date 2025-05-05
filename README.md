@@ -1,58 +1,95 @@
 <pre markdown="1">
-Flow diagram visualizing the relationship between the structs
 
-                 1. Parsing
-┌───────────────────────────────────────────────────┐
-│                      t_data                       │
-│ ┌───────────────────────────────────────────────┐ │
-│ │ tokens: t_token[MAX_TOKENS]                   │ │
-│ │ token_count: int                              │ │
-│ │ commands: t_command[MAX_COMMANDS]             │ │
-│ │ cmd_count: int                                │ │
-│ │ env: char**                                   │ │
-│ │ last_status: int                              │ │
-│ └───────────────────────────────────────────────┘ │
-└───────────────────────────────────────────────────┘
-            │
-            ├───────────────────────────────┐
-            ▼                               ▼
-┌───────────────────────┐       ┌─────────────────────────┐
-│       t_token         │       │       t_command         │
-│ ┌───────────────────┐ │       │ ┌─────────────────────┐ │
-│ │ value: char*      │ │       │ │ args: char**        │ │◄──┐
-│ │ type: token_type  │ │       │ │ redirs: t_redir*    │ │   │
-│ │ quote: t_quote    │ │       │ │ redir_count: int    │ │   │
-│ └───────────────────┘ │       │ │ pipe_in: int        │ │   │
-└───────────────────────┘       │ │ pipe_out: int       │ │   │
-            ▲                   └─────────────────────┘ │     │
-            │                       │                   │     │
-            │                       ├───────────────────┘     │
-            │                       ▼                         │
-            │               ┌─────────────────┐               │
-            │               │    t_redir      │               │
-            │               │ ┌─────────────┐ │               │
-            │               │ │ file: char* │ │               │
-            │               │ │ type: int   │ │               │
-            │               │ └─────────────┘ │               │
-            │               └─────────────────┘               │
-            │                                                 │
-            │                                                 │
-            └─────────────────────────────────────────────────┘
-                         2. Execution (later)
-                               │
-                ┌──────────────┴──────────────┐
-                ▼                             ▼
-┌───────────────────────────────┐  ┌───────────────────────────────┐
-│        Command Execution      │  │       Redirection Handling    │
-│                               │  │                               │
-│ ► For each t_command:         │  │ ► For each t_redir in command:│
-│   - fork()                    │  │   - open()/pipe()             │
-│   - if child:                 │  │   - dup2() to redirect        │
-│     • dup2(pipe_in, STDIN)    │  │     stdin/stdout              │
-│     • dup2(pipe_out, STDOUT)  │  │                               │
-│     • execve(args[0], args)   │  │ ► Heredocs create temp files  │
-│                               │  │                               │
-└───────────────────────────────┘  └───────────────────────────────┘
+                          ┌────────────────────┐
+                          │   minishell REPL   │
+                          └────────────────────┘
+                                     │
+                                     ▼
+                          ┌────────────────────┐
+                          │ readline("…> ")    │
+                          └────────────────────┘
+                                     │
+                      ┌──────────────┴──────────────┐
+                      │                             │
+                  EOF?│                         non-empty?
+                      │ Yes                         │ Yes
+                      ▼                             ▼
+                 ┌──────────┐                  ┌──────────────┐
+                 │  exit    │                  │ add_history  │
+                 └──────────┘                  └──────────────┘
+                                                    │
+                                                    ▼
+                                             ┌──────────────┐
+                                             │ tokenize_    │
+                                             │ input()      │
+                                             └──────────────┘
+                                                    │
+                                                    ▼
+                                             ┌──────────────┐
+                                             │ validate_    │
+                                             │ syntax()     │
+                                             └──────────────┘
+                                                    │
+                                             ┌──────┴──────┐
+                                             │             │
+                                       syntax OK? No      Yes
+                                             │             │
+                                             ▼             ▼
+                                       ┌──────────┐   ┌──────────────┐
+                                       │ free_all │   │ expand_      │
+                                       └──────────┘   │ tokens()     │
+                                                      └──────────────┘
+                                                             │
+                                                             ▼
+                                                      ┌──────────────┐
+                                                      │ parse_       │
+                                                      │ tokens()     │
+                                                      └──────────────┘
+                                                             │
+                                                      ┌──────┴──────┐
+                                                      │             │
+                                                  done cmds?    loop
+                                                      │             │
+                                                      ▼             ▼
+                                                ┌──────────┐    back to
+                                                │ free_all │    readline
+                                                └──────────┘
+------------------------------------------------------------------------------------
+
+Flow diagram visualizing the relationship between the parsing and execution
+
+            1. struct contains parsed data required for the execution
+                       ┌──────────────────────────────┐
+                       │           t_data             │
+                       ├──────────────────────────────┤
+                       │ tokens:    t_token[MAX_TOKENS] │
+                       │ token_count: int             │
+                       │                              │
+                       │ commands:  t_command[MAX_CMD]│◀─── populated by parser()
+                       │ cmd_count:  int              │
+                       │                              │
+                       │ env:       char **           │
+                       │ last_status: int             │
+                       └──────────────────────────────┘
+                                      │
+                                      ▼
+                              (pass pointer to)
+                                      │
+            2. *prototype* struct to handle execution of the parsed commands
+                       ┌──────────────────────────────┐
+                       │         t_executor           │
+                       ├──────────────────────────────┤
+                       │ • commands: t_command *      │◄── from t_data.commands
+                       │ • cmd_count:  int            │◄── from t_data.cmd_count
+                       │ • env:        char **        │◄── from t_data.env
+                       │ • last_status: int           │◄── from t_data.last_status
+                       │ • pipes:      int (*)[2]     │
+                       │ • pids:       pid_t *        │
+                       └──────────────────────────────┘
+                                      │
+                                      ▼
+                       executor() loops over commands[]
+                       and uses each t_command.redirs[] internally
 
 Detailed Struct Relationships:
 1. t_data is the root container:
@@ -73,7 +110,7 @@ Detailed Struct Relationships:
 4. t_redir specifies I/O manipulation:
    - type determines operation (>, >>, <, <<)
    - file stores target filename/delimiter
-
+-------------------------------------------------
 Key Execution Steps Using Structs:
 1. Pipe Creation:
    - Create N-1 pipes for N commands using pipe()
@@ -102,9 +139,9 @@ Key Execution Steps Using Structs:
 
 ------------------------------------------------------------------------
 
-Example
+Example 1
 
-                1. Tokenization
+1. Tokenization
 ┌───────────────────────────────────────────────────────┐
 │                Input: "ls -l | grep c > out.txt"      │
 └───────────────────────────────────────────────────────┘
@@ -124,8 +161,7 @@ Example
 │ │   6   │ "out.txt" │     WORD      │   NO_QUOTE    │ │
 └───────────────────────────────────────────────────────┘
 
-                2. Parsing
-
+2. Parsing
 ┌───────────────────────────────────────────────────────┐
 │            struct       t_data.commands[]             │
 ├───────────────────────────────────────────────────────┤
@@ -148,8 +184,7 @@ Example
 │  └─────────────────────────────────────────────────┘  │
 └───────────────────────────────────────────────────────┘
 
-                3. Execution (later)
-
+3. Execution (later)
         ┌───────────────────┐               ┌───────────────────┐
         │    Command 0      │               │    Command 1      │
         │ (ls -l)           │               │ (grep c > out.txt)│
@@ -162,4 +197,62 @@ Example
         │ │ - execve("/bin/ls", args)       │ │ - dup2(fd, STDOUT) │
         │ └───────────────┘ │               │ │ - execve("/bin/grep", args) │
         └───────────────────┘               └───────────────────┘
+<<<<<<< HEAD
+
+---------------------------------------------------------------
+
+Example 2
+
+1. Tokenization
+┌───────────────────────────────────────────────────────┐
+│   Input: "echo \"Hello $USER\" | cat > greeting.txt"  │
+└───────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌───────────────────────────────────────────────────────┐
+│                t_data.tokens[]                        │
+│ ┌───────┬──────────────────┬──────────────┬──────────┐ │
+│ │ Index │      value       │    type      │  quote   │ │
+│ ├───────┼──────────────────┼──────────────┼──────────┤ │
+│ │   0   │     "echo"       │    WORD      │ NO_QUOTE │ │
+│ │   1   │   "Hello $USER"  │    WORD      │ DBL_QUOTE│ │
+│ │   2   │      NULL        │    PIPE      │ NO_QUOTE │ │
+│ │   3   │     "cat"        │    WORD      │ NO_QUOTE │ │
+│ │   4   │      NULL        │  REDIR_OUT   │ NO_QUOTE │ │
+│ │   5   │  "greeting.txt"  │    WORD      │ NO_QUOTE │ │
+└───────────────────────────────────────────────────────┘
+
+2. Expansion
+┌───────────────────────────────────────────────────────┐
+│          After expanding $USER (e.g., "nakhalil")     │
+│ ┌───────┬──────────────────┬──────────────┬──────────┐ │
+│ │   1   │ "Hello nakhalil" │    WORD      │ DBL_QUOTE│ │
+└───────────────────────────────────────────────────────┘
+
+3. Parsing
+┌───────────────────────────────────────────────────────┐
+│                   t_data.commands[]                   │
+├───────────────────────────────────────────────────────┤
+│  Command 0: "echo \"Hello $USER\""                    │
+│  ┌─────────────────────────────────────────────────┐  │
+│  │ args: ["echo", "Hello nakhalil", NULL]          │  │
+│  │ redirs: []                                      │  │
+│  │ redir_count: 0                                  │  │
+│  │ pipe_in: 0 (stdin)                              │  │
+│  │ pipe_out: pipe_fd[1] (write end)                │  │
+│  └─────────────────────────────────────────────────┘  │
+│                                                       │
+│  Command 1: "cat > greeting.txt"                      │
+│  ┌─────────────────────────────────────────────────┐  │
+│  │ args: ["cat", NULL]                             │  │
+│  │ redirs: { file: "greeting.txt", type: REDIR_OUT }│  │
+│  │ redir_count: 1                                  │  │
+│  │ pipe_in: pipe_fd[0] (read end)                  │  │
+│  │ pipe_out: 1 (stdout)                            │  │
+│  └─────────────────────────────────────────────────┘  │
+└───────────────────────────────────────────────────────┘
+
 </pre>
+=======
+</pre>
+>>>>>>> 67c3b0989c652b5a84dddb0957810acdc1d38ae6
