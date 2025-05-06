@@ -251,7 +251,92 @@ Example 2
 │  │ pipe_out: 1 (stdout)                            │  │
 │  └─────────────────────────────────────────────────┘  │
 └───────────────────────────────────────────────────────┘
+---------------------------------------
+1. Main Execution loop
+idx ← 0
+while idx < data.cmd_count do
+    cmd ← data.commands[idx]
+
+    if is_builtin(cmd.args[0]) then
+        data.last_status ← run_builtin(cmd.args, data)
+        idx ← idx + 1
+        continue
+    end if
+
+    pid ← fork()
+    if pid < 0 then
+        error_exit("fork failed")
+    end if
+
+    if pid = 0 then
+        // Child process
+        setup_pipes(cmd)
+        apply_redirections(cmd)
+        resolve_and_exec(cmd.args, data.env)
+        error_exit("exec failed")
+    end if
+
+    // Parent process
+    record_child_pid(pid)
+    close_unused_fds(cmd)
+    idx ← idx + 1
+end while
+
+wait_for_all_children(data.last_status)
+free_data(data)
+
+------------------------------
+2. Redirection handling
+
+j ← 0
+while j < cmd.redir_count do
+    r ← cmd.redirs[j]
+    if r.type = REDIR_IN then
+        fd ← open(r.file, READ_ONLY)
+    else
+        flags ← WRITE_ONLY | CREATE
+        if r.type = REDIR_APPEND then
+            flags ← flags | APPEND
+        else
+            flags ← flags | TRUNCATE
+        end if
+        fd ← open(r.file, flags, 0644)
+    end if
+
+    if fd < 0 then
+        error_exit("cannot open " + r.file)
+    end if
+
+    if r.type = REDIR_IN then
+        dup2(fd, STDIN)
+    else
+        dup2(fd, STDOUT)
+    end if
+    close(fd)
+    j ← j + 1
+end while
+------------------------
+3. Path resolution and execve
+
+if cmd.args[0] contains "/" then
+    execve(cmd.args[0], cmd.args, data.env)
+else
+    path_var ← getenv("PATH")
+    for each dir in split(path_var, ":") do
+        fullpath ← dir + "/" + cmd.args[0]
+        if is_executable(fullpath) then
+            execve(fullpath, cmd.args, data.env)
+        end if
+    end for
+end if
+-------------------------
+4. Signal handling
+// In parent before loop:
+set_signal(SIGINT,  handler_parent)
+set_signal(SIGQUIT, handler_parent)
+
+// In child before execve:
+set_signal(SIGINT,  DEFAULT)
+set_signal(SIGQUIT, DEFAULT)
 
 </pre>
-</pre>
->>>>>>> 67c3b0989c652b5a84dddb0957810acdc1d38ae6

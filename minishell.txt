@@ -1,0 +1,928 @@
+==> expander.c <==
+#include "minishell.h"
+
+/**
+ * expand_env_var
+ *   Given a variable name (without the leading '$') and an environment array,
+ *   searches for NAME=value in env.  Returns a newly-allocated copy of the
+ *   value part, or an empty string if not found.
+ *
+ *   var_name: NUL-terminated variable name to look up
+ *   env: the inherited environment (NULL-terminated array of "KEY=VALUE")
+ *
+ *   Returns: malloc’d string of the variable’s value (or "").
+ */
+static char *expand_env_var(char *var_name, char **env)
+{
+    int i = 0;
+    int len = ft_strlen(var_name);
+
+    while (env[i])
+    {
+        if (ft_strncmp(env[i], var_name, len) == 0
+            && env[i][len] == '=')
+            return ft_strdup(env[i] + len + 1);
+        i++;
+    }
+    return ft_strdup("");
+}
+
+/**
+ * expand_variable
+ *   Called when a '$' is encountered in a WORD token.  Extracts the variable
+ *   name (handles "$?" specially), looks up its value, and appends it to *result.
+ *
+ *   result: pointer to the growing result string (must be NULL or malloc’d)
+ *   ptr:    pointer into the original token->value at the '$'
+ *   data:   full shell data (for last_status and env)
+ *
+ *   Returns: pointer just *after* the variable name in the original string.
+ */
+char *expand_variable(char **result, char *ptr, t_data *data)
+{
+    char var_name[256];
+    int  i = 0;
+
+    ptr++;  // Skip the '$'
+
+    if (*ptr == '?')
+        var_name[i++] = *ptr++;
+    else
+        while (ft_isalnum(*ptr) || *ptr == '_')
+            var_name[i++] = *ptr++;
+    var_name[i] = '\0';
+
+    /* If it was `$?`, expand to last status; otherwise look up in env. */
+    char *expanded = (var_name[0] == '?' )
+        ? ft_itoa(data->last_status)
+        : expand_env_var(var_name, data->env);
+
+        *result = str_append_str(*result, expanded);
+    return ptr;
+}
+
+/**
+ * expand_tokens
+ *   Walks every token in data->tokens[].  For each WORD that’s not SINGLE_QUOTE,
+ *   repeatedly calls expand_variable (on any '$') and rebuilds token->value.
+ *
+ *   data: the shell data structure, with token_count + tokens[] filled by the lexer.
+ */
+void expand_tokens(t_data *data) {
+    for (int i = 0; i < data->token_count; i++) {
+        t_token *token = &data->tokens[i];
+
+        /* skip non-WORDs and single-quoted WORDs */
+        if (token->type != WORD || token->quote == SINGLE_QUOTE)
+            continue;
+
+        char *result = ft_strdup("");
+        char *ptr = token->value;
+        
+        while (ptr && *ptr) {
+            if (*ptr == '$' && (token->quote != SINGLE_QUOTE)) {
+                ptr = expand_variable(&result, ptr, data);
+            } else {
+                result = str_append_char(result, *ptr);
+                ptr++;
+            }
+        }
+        
+        free(token->value);
+        token->value = result;
+    }
+}
+
+==> main.c <==
+#include "minishell.h"
+
+// static void debug_print_tokens(t_data *data)
+// {
+//     printf("→ [debug] token_count = %d\n", data->token_count);
+//     for (int i = 0; i < data->token_count; i++)
+//     {
+//         t_token *tok = &data->tokens[i];
+//         printf("   token[%d]: type=%d, quote=%d, value=\"%s\"\n",
+//                i, tok->type, tok->quote, tok->value ? tok->value : "NULL");
+//     }
+// }
+
+// static void debug_print_commands(t_data *data)
+// {
+//     printf("→ [debug] cmd_count   = %d\n", data->cmd_count);
+//     for (int c = 0; c < data->cmd_count; c++)
+//     {
+//         t_command *cmd = &data->commands[c];
+//         printf("   command[%d]:\n", c);
+
+//         if (cmd->args)
+//         {
+//             for (int j = 0; cmd->args[j]; j++)
+//                 printf("      arg[%d] = \"%s\"\n", j, cmd->args[j]);
+//         }
+//         else
+//             printf("      (no args)\n");
+
+//         for (int r = 0; r < cmd->redir_count; r++)
+//         {
+//             printf("      redir[%d]: type=%d, file=\"%s\"\n",
+//                    r, cmd->redirs[r].type, cmd->redirs[r].file);
+//         }
+//     }
+// }
+
+int main(int argc, char **argv, char **envp)
+{
+    t_data  data = {
+        .token_count = 0,
+        .cmd_count   = 0,
+        .env         = envp,
+        .last_status = 0
+    };
+    char    *input;
+
+    (void)argc;
+    (void)argv;
+    setup_signals();
+
+    while (1)
+    {
+        input = readline("minishell> ");
+        if (!input)
+        {
+            write(1, "exit\n", 5);
+            break;
+        }
+
+        if (*input)
+        {
+            add_history(input);
+            if (tokenize_input(input, &data) == 0
+                && validate_syntax(&data))
+            {
+                // Debug dump: raw tokens
+                // debug_print_tokens(&data);
+
+                // Expand $vars, then parse into commands
+                expand_tokens(&data);
+                parse_tokens(&data);
+
+                // Debug dump: parsed commands/redirects
+                // debug_print_commands(&data);
+            }
+            free(input);
+            free_data(&data);
+        }
+    }
+    return (0);
+}
+
+==> parser.c <==
+#include "minishell.h"
+
+/**
+ * Adds a redirection to the current command.
+ *
+ * This function reallocates the command's redirection array to accommodate
+ * a new redirection, copies existing redirections into the new array,
+ * appends the new redirection (based on the current token and the next one),
+ * and updates the command's redirection count.
+ *
+ * @param cmd   Pointer to the current command being populated.
+ * @param data  Pointer to the main shell data structure containing tokens.
+ * @param i     Pointer to the current token index. This will be advanced by 2.
+ * @return      Always returns 0.
+ */
+static int	add_redirection(t_command *cmd, t_data *data, int *i)
+{
+	t_redir	*new_redirs;
+	int		j;
+
+	// Allocate space for one more redirection.
+	new_redirs = safe_malloc(sizeof(t_redir) * (cmd->redir_count + 1));
+
+	// Copy existing redirections into the new array.
+	j = -1;
+	while (++j < cmd->redir_count)
+		new_redirs[j] = cmd->redirs[j];
+
+	// Add the new redirection (type and target file).
+	new_redirs[cmd->redir_count].type = data->tokens[*i].type;
+	new_redirs[cmd->redir_count].file = ft_strdup(data->tokens[*i + 1].value);
+
+	// Replace the old redirection array with the new one.
+	free(cmd->redirs);
+	cmd->redirs = new_redirs;
+	cmd->redir_count++;
+
+	// Skip over redirection token and its target.
+	*i += 2;
+	return (0);
+}
+
+/**
+ * Parses the list of tokens into an array of command structures.
+ *
+ * This function reads the tokens, splits them into commands (based on PIPE tokens),
+ * adds redirections when detected, and collects arguments.
+ *
+ * All parsed commands and their data are stored in `data->commands`,
+ * and the total number of parsed commands is stored in `data->cmd_count`.
+ *
+ * @param data  Pointer to the main shell data structure containing tokens.
+ * @return      Always returns 0.
+ */
+int	parse_tokens(t_data *data)
+{
+	int	cmd_idx = 0;
+	int	i = 0;
+
+	data->cmd_count = 0;
+
+	// Loop through all tokens, breaking at each PIPE to form new commands.
+	while (i < data->token_count && cmd_idx < MAX_COMMANDS)
+	{
+		// Initialize the current command.
+		data->commands[cmd_idx].args = NULL;
+		data->commands[cmd_idx].redirs = NULL;
+		data->commands[cmd_idx].redir_count = 0;
+
+		// Parse the tokens for the current command until a PIPE or end is reached.
+		while (i < data->token_count && data->tokens[i].type != PIPE)
+		{
+			// Handle redirection token and target.
+			if (data->tokens[i].type >= REDIR_IN)
+				add_redirection(&data->commands[cmd_idx], data, &i);
+			else
+			{
+				// Add token to argument list.
+				data->commands[cmd_idx].args = ft_extend_arr(
+					data->commands[cmd_idx].args, data->tokens[i++].value);
+			}
+		}
+
+		// Skip the PIPE token if present.
+		if (i < data->token_count && data->tokens[i].type == PIPE)
+			i++;
+
+		// Move to the next command slot.
+		cmd_idx++;
+	}
+
+	data->cmd_count = cmd_idx;
+	return (0);
+}
+
+==> signals.c <==
+#include "minishell.h"
+
+volatile sig_atomic_t g_signal = 0;
+
+int		rl_replace_line(const char *line, int clear_undo);
+
+/**
+ * sigint_handler
+ *   Called on Ctrl-C in the interactive shell.  Prints a newline,
+ *   resets the readline prompt, and sets an internal global to 130.
+ */
+void sigint_handler(int sig)
+{
+    (void)sig;
+    write(1, "\n", 1);
+    rl_replace_line("", 0);
+    rl_on_new_line();
+    rl_redisplay();
+    g_signal = 130;
+}
+
+/**
+ * setup_signals
+ *   Installs sigint_handler for SIGINT, ignores SIGQUIT.
+ */
+void setup_signals(void)
+{
+    struct sigaction sa;
+    
+    sa.sa_handler = sigint_handler;
+    sa.sa_flags = SA_RESTART;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGINT, &sa, NULL);
+    signal(SIGQUIT, SIG_IGN);
+}
+
+==> syntax_check.c <==
+#include "minishell.h"
+
+/**
+ * Print a more specific “unexpected token” error.
+ */
+static void print_unexpected_token(t_token_type type)
+{
+    if (type == PIPE)
+        ft_putstr_fd("minishell: syntax error near unexpected token `|'\n", 2);
+    else if (type == REDIR_IN)
+        ft_putstr_fd("minishell: syntax error near unexpected token `<'\n", 2);
+    else if (type == REDIR_OUT)
+        ft_putstr_fd("minishell: syntax error near unexpected token `>'\n", 2);
+    else if (type == REDIR_HEREDOC)
+        ft_putstr_fd("minishell: syntax error near unexpected token `<<'\n", 2);
+    else if (type == REDIR_APPEND)
+        ft_putstr_fd("minishell: syntax error near unexpected token `>>'\n", 2);
+}
+
+/**
+ * Disallow:
+ *   - first or last token being a pipe
+ *   - two pipes in a row
+ *   - pipe with no command on either side
+ */
+static int check_pipes(t_data *data)
+{
+    int i;
+    int prev_was_word;
+
+    if (data->token_count == 0)
+        return (1);
+
+    if (data->tokens[0].type == PIPE)
+    {
+        print_unexpected_token(PIPE);
+        return (0);
+    }
+    if (data->tokens[data->token_count - 1].type == PIPE)
+    {
+        print_unexpected_token(PIPE);
+        return (0);
+    }
+
+    prev_was_word = 1;  // treat “before the first token” as a command boundary
+    for (i = 1; i < data->token_count; i++)
+    {
+        if (data->tokens[i].type == PIPE)
+        {
+            if (!prev_was_word
+                || data->tokens[i + 1].type == PIPE)
+            {
+                print_unexpected_token(PIPE);
+                return (0);
+            }
+            prev_was_word = 0;
+        }
+        else
+            prev_was_word = (data->tokens[i].type == WORD);
+    }
+    return (1);
+}
+
+/**
+ * Disallow:
+ *   - redir at start or end
+ *   - redir not followed by a WORD
+ *   - two redirs in a row
+ */
+static int check_redirs(t_data *data)
+{
+    int i;
+
+    if (data->token_count == 0)
+        return (1);
+
+    /* 1) cannot start with a redirection */
+    if (data->tokens[0].type >= REDIR_IN && data->tokens[0].type <= REDIR_HEREDOC)
+    {
+        print_unexpected_token(data->tokens[0].type);
+        return (0);
+    }
+
+    i = 0;
+    while (i < data->token_count)
+    {
+        if (data->tokens[i].type >= REDIR_IN
+            && data->tokens[i].type <= REDIR_HEREDOC)
+        {
+            /* must not be last, and must be followed by WORD */
+            if (i + 1 >= data->token_count
+                || data->tokens[i + 1].type != WORD)
+            {
+                print_unexpected_token(data->tokens[i].type);
+                return (0);
+            }
+            /* no two redirs back-to-back */
+            if (i > 0
+                && data->tokens[i - 1].type >= REDIR_IN
+                && data->tokens[i - 1].type <= REDIR_HEREDOC)
+            {
+                print_unexpected_token(data->tokens[i].type);
+                return (0);
+            }
+            i += 2;  // skip the filename
+        }
+        else
+            i++;
+    }
+    return (1);
+}
+
+/**
+ * Disallow any two non-WORD tokens in a row
+ * (e.g. “| >”, “<< >>”, etc.)
+ */
+static int check_delimiter_sequences(t_data *data)
+{
+    int i;
+
+    i = 1;
+    while (i < data->token_count)
+    {
+        if (data->tokens[i].type != WORD
+            && data->tokens[i - 1].type != WORD)
+        {
+            print_unexpected_token(data->tokens[i].type);
+            return (0);
+        }
+        i++;
+    }
+    return (1);
+}
+
+/**
+ * validate_syntax
+ *   Top‐level syntax validator.  Combines pipe, redir, and
+ *   delimiter‐sequence checks.  On *any* failure, resets data->cmd_count=0
+ *   so that free_data() is safe, then returns 0.
+ *
+ *   Returns: 1 if syntax is OK, 0 on error.
+ */
+int validate_syntax(t_data *data)
+{
+    if (!check_pipes(data)
+        || !check_redirs(data)
+        || !check_delimiter_sequences(data))
+    {
+        data->cmd_count = 0;
+        return (0);
+    }
+    return (1);
+}
+
+==> tokenizer.c <==
+#include "minishell.h"
+
+/**
+ * ft_isspace
+ *   Returns true if c is any standard ASCII whitespace.
+ */
+static int ft_isspace(char c)
+{
+    return (c == ' ' || c == '\t' || c == '\n'
+         || c == '\v' || c == '\f' || c == '\r');
+}
+
+/**
+ * quote_type_to_char
+ *   Converts our t_quote enum into its literal delimiter (\' or \").
+ */
+static char quote_type_to_char(t_quote type)
+{
+    if (type == SINGLE_QUOTE) return '\'';
+    if (type == DOUBLE_QUOTE) return '"';
+    return 0;
+}
+
+/**
+ * update_quote_state
+ *   Toggles or maintains quote state when seeing ' or ".
+ *   Ensures that nested/unmatched quotes are tracked.
+ */
+static t_quote update_quote_state(t_quote current, char c)
+{
+    if (c == '\'')
+    {
+        if (current == SINGLE_QUOTE)
+            return NO_QUOTE;
+        else
+            return SINGLE_QUOTE;
+    }
+    else if (c == '"')
+    {
+        if (current == DOUBLE_QUOTE)
+            return NO_QUOTE;
+        else
+            return DOUBLE_QUOTE;
+    }
+    else
+        return current;
+}
+
+/**
+ * handle_quotes
+ *   Called when lexer sees ' or ".  Grabs everything up to the matching
+ *   delimiter (or errors out on unterminated), produces one WORD token
+ *   with quote=SINGLE_QUOTE or DOUBLE_QUOTE.
+ */
+static void handle_quotes(char *input, int *i, t_data *data)
+{
+    t_quote quote_type = (input[*i] == '\'') ? SINGLE_QUOTE : DOUBLE_QUOTE;
+    int start = ++(*i);
+
+    /* advance until matching ' or " */
+    while (input[*i] && input[*i] != quote_type_to_char(quote_type))
+        (*i)++;
+
+    char *value = ft_substr(input, start, *i - start);
+    if (input[*i])
+        (*i)++;
+    else
+    {
+        ft_putstr_fd("minishell: unterminated quote\n", 2);
+        free(value);
+        return;
+    }
+
+    data->tokens[data->token_count++] = (t_token){
+        .value = value,
+        .type  = WORD,
+        .quote = quote_type
+    };
+}
+
+/**
+ * handle_redir_pipe
+ *   Called when lexer sees one of |, <, <<, >, >>.
+ *   Emits a token of type PIPE/REDIR_* with NULL value.
+ */
+static void handle_redir_pipe(char *input, int *i, t_data *data)
+{
+    t_token_type type;
+
+    if (input[*i] == '|')
+        type = PIPE, (*i)++;
+    else if (input[*i] == '<' && input[*i + 1] == '<')
+        type = REDIR_HEREDOC, (*i) += 2;
+    else if (input[*i] == '<')
+        type = REDIR_IN, (*i)++;
+    else if (input[*i] == '>' && input[*i + 1] == '>')
+        type = REDIR_APPEND, (*i) += 2;
+    else /* must be single > */
+        type = REDIR_OUT, (*i)++;
+
+    data->tokens[data->token_count++] = (t_token){NULL, type, NO_QUOTE};
+}
+
+/**
+ * handle_word
+ *   Grabs an unquoted “word” (including embedded quotes) up until whitespace
+ *   or one of the special chars.  Emits a WORD token with quote=NO_QUOTE.
+ */
+static void handle_word(char *input, int *i, t_data *data)
+{
+    int start = *i;
+    t_quote current_quote = NO_QUOTE;
+
+    while (input[*i]
+       && (current_quote != NO_QUOTE
+        || !ft_strchr(" |<>\"\'", input[*i])))
+    {
+        if (input[*i] == '\'' || input[*i] == '"')
+            current_quote = update_quote_state(current_quote, input[*i]);
+        (*i)++;
+    }
+
+    char *value = ft_substr(input, start, *i - start);
+    data->tokens[data->token_count++] = (t_token){
+        .value = value,
+        .type  = WORD,
+        .quote = NO_QUOTE
+    };
+}
+
+/**
+ * tokenize_input
+ *   Top‐level lexer: splits `input` into tokens[] up to MAX_TOKENS.
+ *   Returns 0 on success (we don’t use the return code for errors here).
+ */
+int tokenize_input(char *input, t_data *data)
+{
+    int i = 0;
+    data->token_count = 0;
+
+    while (input[i] && data->token_count < MAX_TOKENS - 1)
+    {
+        while (ft_isspace(input[i])) i++;
+        if (!input[i]) break;
+
+        if (input[i] == '|' || input[i] == '<' || input[i] == '>')
+            handle_redir_pipe(input, &i, data);
+        else if (input[i] == '\'' || input[i] == '"')
+            handle_quotes(input, &i, data);
+        else
+            handle_word(input, &i, data);
+    }
+    return 0;
+}
+
+==> utils.c <==
+#include "minishell.h"
+
+/**
+ * ft_extend_arr
+ *   Appends new_str to a NULL-terminated array of strings,
+ *   returns the new malloc’d array.
+ */
+char	**ft_extend_arr(char **arr, char *new_str)
+{
+	char	**new;
+	int		count;
+	int		i;
+
+	count = 0;
+	while (arr && arr[count])
+		count++;
+	new = safe_malloc(sizeof(char *) * (count + 2));
+	i = -1;
+	while (++i < count)
+		new[i] = arr[i];
+	new[count] = ft_strdup(new_str);
+	new[count + 1] = NULL;
+	free(arr);
+	return (new);
+}
+
+/**
+ * free_data
+ *   Frees all dynamic memory in data->tokens and data->commands,
+ *   including token->value, commands[].args[], commands[].redirs[].file.
+ */
+void	free_data(t_data *data)
+{
+	int	i;
+	int	j;
+
+	i = -1;
+	while (++i < data->token_count)
+		free(data->tokens[i].value);
+	
+	i = -1;
+	while (++i < data->cmd_count)
+	{
+		ft_free_arr(data->commands[i].args);
+		j = -1;
+		while (++j < data->commands[i].redir_count)
+			free(data->commands[i].redirs[j].file);
+		free(data->commands[i].redirs);
+	}
+}
+
+/**
+ * safe_malloc
+ *   malloc wrapper that exits(1) on failure.
+ */
+void    *safe_malloc(size_t size)
+{
+    void *ptr = malloc(size);
+    if (!ptr)
+    {
+        write(2, "Malloc error\n", 13);
+        exit(EXIT_FAILURE);
+    }
+    return (ptr);
+}
+
+/**
+ * str_append_char
+ *   Append a single char 'c' to the end of string 's'.
+ *   Reallocates a new buffer of length+2, copies s, frees s,
+ *   writes c then '\0', and returns the new pointer.
+ */
+char *str_append_char(char *s, char c)
+{
+    size_t len = s ? ft_strlen(s) : 0;
+    char *new_str = safe_malloc(len + 2);
+    if (s)
+    {
+        ft_memcpy(new_str, s, len);
+        free(s);
+    }
+    new_str[len]     = c;
+    new_str[len + 1] = '\0';
+    return new_str;
+}
+
+/**
+ * str_append_str
+ *   Append the entire string 'suffix' onto 's'.  Reallocates a new buffer of
+ *   length(s)+length(suffix)+1, copies both, frees both inputs, and returns it.
+ */
+char *str_append_str(char *s, char *suffix)
+{
+    size_t len1 = s ? ft_strlen(s) : 0;
+    size_t len2 = ft_strlen(suffix);
+    char *new   = safe_malloc(len1 + len2 + 1);
+
+    if (s)
+    {
+        ft_memcpy(new, s, len1);
+        free(s);
+    }
+    ft_memcpy(new + len1, suffix, len2 + 1);
+    free(suffix);
+    return new;
+}
+
+/**
+ * ft_free_arr
+ *   Frees a NULL-terminated array of strings.
+ */
+void	ft_free_arr(char **arr)
+{
+	int	i;
+
+	i = 0;
+	while (arr && arr[i])
+		free(arr[i++]);
+	free(arr);
+}
+
+==> minishell.h <==
+#ifndef MINISHELL_H
+# define MINISHELL_H
+
+# include "libft/libft.h"
+# include <readline/history.h>
+# include <readline/readline.h>
+# include <signal.h>
+# include <stdlib.h>
+# include <unistd.h>
+
+/*
+ * Limits
+ *   MAX_TOKENS   — maximum number of lexical tokens in one input line
+ *   MAX_COMMANDS — maximum number of pipe-separated commands
+ */
+# define MAX_TOKENS 100
+# define MAX_COMMANDS 20
+
+/*
+ * t_quote
+ *   Tracks whether a token was enclosed in single or double quotes,
+ *   or not quoted at all.  Single quotes inhibit *all* expansion,
+ *   double quotes inhibit everything except `$`‐expansion.
+ */
+typedef enum e_quote
+{
+	NO_QUOTE,
+	SINGLE_QUOTE,
+	DOUBLE_QUOTE
+}					t_quote;
+
+/*
+ * t_token_type
+ *   Classifies each lexed item as:
+ *     WORD         — a bare word (possibly with quotes)
+ *     PIPE         — '|' for piping
+ *     REDIR_IN     — '<' for input redirection
+ *     REDIR_OUT    — '>' for output redirection (truncate)
+ *     REDIR_APPEND — '>>' for output append
+ *     REDIR_HEREDOC— '<<' here‐document
+ */
+typedef enum e_token_type
+{
+	WORD,
+	PIPE,
+	REDIR_IN,
+	REDIR_OUT,
+	REDIR_APPEND,
+	REDIR_HEREDOC
+}					t_token_type;
+
+/*
+ * s_token
+ *   Holds the raw text and metadata of each lexed piece.
+ *     value — malloc’d string (for REDIR/PIPE, value is NULL)
+ *     type  — one of t_token_type
+ *     quote — whether it came from within single/double quotes
+ */
+typedef struct s_token
+{
+	char			*value;
+	t_token_type	type;
+	t_quote			quote;
+}					t_token;
+
+/*
+ * s_redir
+ *   Represents a single redirection on a command:
+ *     file — filename or here‐doc delimiter string
+ *     type — what kind of redirection this is
+ */
+typedef struct s_redir
+{
+	char			*file;
+	t_token_type	type;
+}					t_redir;
+
+/*
+ * s_command
+ *   Encapsulates one command (one segment of a possible pipeline):
+ *     args        — NULL‐terminated argv array (after expansion)
+ *     redirs      — dynamic array of s_redir entries
+ *     redir_count — how many entries in redirs[]
+ *     pipe_in     — fd to use for STDIN (set later by executor)
+ *     pipe_out    — fd to use for STDOUT
+ */
+typedef struct s_command
+{
+	char			**args;
+	t_redir			*redirs;
+	int				redir_count;
+	int				pipe_in;
+	int				pipe_out;
+}					t_command;
+
+/*
+ * s_data
+ *   Top‐level “session” state, passed around during one REPL iteration:
+ *     tokens      — tokenized tokens[MAX_TOKENS]
+ *     token_count — actual number of tokens
+ *     commands    — parsed commands[MAX_COMMANDS]
+ *     cmd_count   — actual number of commands
+ *     env         — inherited environment pointer
+ *     last_status — exit status of last foreground job ($?)
+ */
+typedef struct s_data
+{
+	t_token			tokens[MAX_TOKENS];
+	int				token_count;
+	t_command		commands[MAX_COMMANDS];
+	int				cmd_count;
+	char			**env;
+	int				last_status;
+}					t_data;
+
+/* === Lexer (lexer.c) === */
+int					tokenize_input(char *input, t_data *data);
+
+/* === Parser (parser.c + syntax_check.c) === */
+int					parse_tokens(t_data *data);
+int					validate_syntax(t_data *data);
+
+/* === Expander (expander.c) === */
+void				expand_tokens(t_data *data);
+
+/* === Utilities (utils.c) === */
+void				free_data(t_data *data);
+void				*safe_malloc(size_t size);
+char				*str_append_char(char *s, char c);
+char				*str_append_str(char *s, char *suffix);
+char				**ft_extend_arr(char **arr, char *new_str);
+void				ft_free_arr(char **arr);
+char				*expand_variable(char **result, char *ptr, t_data *data);
+
+/* === Signals (signals.c) === */
+void				setup_signals(void);
+
+#endif
+
+==> Makefile <==
+NAME = minishell
+
+# Compiler
+CC = cc
+CFLAGS = -Wall -Wextra -Werror
+
+# Source files
+SRCS = main.c tokenizer.c parser.c signals.c utils.c expander.c syntax_check.c
+
+# Object files
+OBJS = $(SRCS:.c=.o)
+
+# Includes
+INCLUDES = -I. -I./libft
+
+# Libraries
+LIBS = -L./libft -lft -lreadline -I.brew/opt/readline/include -L/opt/vagrant/embedded/lib -lreadline
+
+# Libft
+LIBFT_DIR = ./libft
+LIBFT = $(LIBFT_DIR)/libft.a
+
+# Rules
+all: $(LIBFT) $(NAME)
+
+$(LIBFT):
+	@make -C $(LIBFT_DIR)
+
+$(NAME): $(OBJS) $(LIBFT)
+	$(CC) $(CFLAGS) $(INCLUDES) -o $(NAME) $(OBJS) $(LIBS)
+
+clean:
+	rm -f $(OBJS)
+	make clean -C $(LIBFT_DIR)
+
+fclean: clean
+	rm -f $(NAME)
+	make fclean -C $(LIBFT_DIR)
+
+re: fclean all
+
+.PHONY: all clean fclean re
