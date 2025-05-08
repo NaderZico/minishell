@@ -1,5 +1,5 @@
 <pre markdown="1">
-
+Current main loop
                           ┌────────────────────┐
                           │   minishell REPL   │
                           └────────────────────┘
@@ -56,6 +56,7 @@
                                                 └──────────┘
 ------------------------------------------------------------------------------------
 Detailed Struct Relationships:
+
 1. t_data is the root container:
    - Contains ALL tokens from tokenization phase
    - Contains ALL commands from parsing phase
@@ -120,7 +121,7 @@ Example 1
 │  └─────────────────────────────────────────────────┘  │
 └───────────────────────────────────────────────────────┘
 
-3. Execution (later)
+3. Execution example
         ┌───────────────────┐               ┌───────────────────┐
         │    Command 0      │               │    Command 1      │
         │ (ls -l)           │               │ (grep c > out.txt)│
@@ -145,22 +146,22 @@ Example 2
                                ▼
 ┌───────────────────────────────────────────────────────┐
 │                t_data.tokens[]                        │
-│ ┌───────┬──────────────────┬──────────────┬──────────┐ │
-│ │ Index │      value       │    type      │  quote   │ │
-│ ├───────┼──────────────────┼──────────────┼──────────┤ │
-│ │   0   │     "echo"       │    WORD      │ NO_QUOTE │ │
-│ │   1   │   "Hello $USER"  │    WORD      │ DBL_QUOTE│ │
-│ │   2   │      NULL        │    PIPE      │ NO_QUOTE │ │
-│ │   3   │     "cat"        │    WORD      │ NO_QUOTE │ │
-│ │   4   │      NULL        │  REDIR_OUT   │ NO_QUOTE │ │
-│ │   5   │  "greeting.txt"  │    WORD      │ NO_QUOTE │ │
+│ ┌───────┬──────────────────┬──────────────┬──────────┐│
+│ │ Index │      value       │    type      │  quote   ││
+│ ├───────┼──────────────────┼──────────────┼──────────┤│
+│ │   0   │     "echo"       │    WORD      │ NO_QUOTE ││
+│ │   1   │   "Hello $USER"  │    WORD      │ DBL_QUOTE││
+│ │   2   │      NULL        │    PIPE      │ NO_QUOTE ││
+│ │   3   │     "cat"        │    WORD      │ NO_QUOTE ││
+│ │   4   │      NULL        │  REDIR_OUT   │ NO_QUOTE ││
+│ │   5   │  "greeting.txt"  │    WORD      │ NO_QUOTE ││
 └───────────────────────────────────────────────────────┘
 
 2. Expansion
 ┌───────────────────────────────────────────────────────┐
 │          After expanding $USER (e.g., "nakhalil")     │
-│ ┌───────┬──────────────────┬──────────────┬──────────┐ │
-│ │   1   │ "Hello nakhalil" │    WORD      │ DBL_QUOTE│ │
+│ ┌───────┬──────────────────┬──────────────┬──────────┐│
+│ │   1   │ "Hello nakhalil" │    WORD      │ DBL_QUOTE││
 └───────────────────────────────────────────────────────┘
 
 3. Parsing
@@ -179,7 +180,7 @@ Example 2
 │  Command 1: "cat > greeting.txt"                      │
 │  ┌─────────────────────────────────────────────────┐  │
 │  │ args: ["cat", NULL]                             │  │
-│  │ redirs: { file: "greeting.txt", type: REDIR_OUT }│  │
+│  │ redirs: { file: "greeting.txt", type: REDIR_OUT }│ │
 │  │ redir_count: 1                                  │  │
 │  │ pipe_in: pipe_fd[0] (read end)                  │  │
 │  │ pipe_out: 1 (stdout)                            │  │
@@ -224,6 +225,7 @@ Flow diagram visualizing the relationship between the parsing and execution
 
 -------------------------------------------------
 Key Execution Steps Using Structs:
+
 1. Pipe Creation:
    - Create N-1 pipes for N commands using pipe()
    - Store read/write ends in commands[i].pipe_out 

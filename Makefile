@@ -6,7 +6,7 @@
 #    By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/04/23 15:41:33 by nakhalil          #+#    #+#              #
-#    Updated: 2025/05/04 15:04:00 by nakhalil         ###   ########.fr        #
+#    Updated: 2025/05/08 14:03:23 by nakhalil         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -17,7 +17,7 @@ CC = cc
 CFLAGS = -Wall -Wextra -Werror
 
 # Source files
-SRCS = main.c tokenizer.c parser.c signals.c utils.c expander.c syntax_check.c
+SRCS = main.c tokenizer.c parser.c signals.c utils.c expander.c syntax_check.c syntax_utils.c
 
 # Object files
 OBJS = $(SRCS:.c=.o)

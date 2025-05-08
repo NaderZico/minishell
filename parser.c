@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/24 17:55:32 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/04/29 19:10:31 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/05/08 14:14:13 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,11 +19,6 @@
  * a new redirection, copies existing redirections into the new array,
  * appends the new redirection (based on the current token and the next one),
  * and updates the command's redirection count.
- *
- * @param cmd   Pointer to the current command being populated.
- * @param data  Pointer to the main shell data structure containing tokens.
- * @param i     Pointer to the current token index. This will be advanced by 2.
- * @return      Always returns 0.
  */
 static int	add_redirection(t_command *cmd, t_data *data, int *i)
 {
@@ -60,9 +55,6 @@ static int	add_redirection(t_command *cmd, t_data *data, int *i)
  *
  * All parsed commands and their data are stored in `data->commands`,
  * and the total number of parsed commands is stored in `data->cmd_count`.
- *
- * @param data  Pointer to the main shell data structure containing tokens.
- * @return      Always returns 0.
  */
 int	parse_tokens(t_data *data)
 {
@@ -71,10 +63,8 @@ int	parse_tokens(t_data *data)
 
 	data->cmd_count = 0;
 
-	// Loop through all tokens, breaking at each PIPE to form new commands.
 	while (i < data->token_count && cmd_idx < MAX_COMMANDS)
 	{
-		// Initialize the current command.
 		data->commands[cmd_idx].args = NULL;
 		data->commands[cmd_idx].redirs = NULL;
 		data->commands[cmd_idx].redir_count = 0;

@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/28 14:25:55 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/04/29 19:11:40 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/05/06 16:34:35 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,25 +23,29 @@
  *
  *   Returns: malloc’d string of the variable’s value (or "").
  */
-static char *expand_env_var(char *var_name, char **env)
+static char	*expand_env_var(char *var_name, char **env)
 {
-    int i = 0;
-    int len = ft_strlen(var_name);
+	int	i;
+	int	len;
 
-    while (env[i])
-    {
-        if (ft_strncmp(env[i], var_name, len) == 0
-            && env[i][len] == '=')
-            return ft_strdup(env[i] + len + 1);
-        i++;
-    }
-    return ft_strdup("");
+	i = 0;
+	len = ft_strlen(var_name);
+	while (env[i])
+	{
+		if (ft_strncmp(env[i], var_name, len) == 0 && env[i][len] == '=')
+		{
+			return (ft_strdup(env[i] + len + 1));
+		}
+		i++;
+	}
+	return (ft_strdup(""));
 }
 
 /**
  * expand_variable
  *   Called when a '$' is encountered in a WORD token.  Extracts the variable
- *   name (handles "$?" specially), looks up its value, and appends it to *result.
+ *   name (handles "$?" specially), looks up its value,
+	and appends it to *result.
  *
  *   result: pointer to the growing result string (must be NULL or malloc’d)
  *   ptr:    pointer into the original token->value at the '$'
@@ -49,57 +53,73 @@ static char *expand_env_var(char *var_name, char **env)
  *
  *   Returns: pointer just *after* the variable name in the original string.
  */
-char *expand_variable(char **result, char *ptr, t_data *data)
+static char	*expand_variable(char **result, char *ptr, t_data *data)
 {
-    char var_name[256];
-    int  i = 0;
+	char	var_name[256];
+	int		i;
+	char	*expanded;
 
-    ptr++;  // Skip the '$'
+	i = 0;
+	ptr++; /* skip the '$' */
+	if (*ptr == '?')
+	{
+		var_name[i++] = *ptr;
+		ptr++;
+	}
+	else
+	{
+		while (ft_isalnum(*ptr) || *ptr == '_')
+			var_name[i++] = *ptr++;
+	}
+	var_name[i] = '\0';
+	if (var_name[0] == '?')
+		expanded = ft_itoa(data->last_status);
+	else
+		expanded = expand_env_var(var_name, data->env);
+	*result = str_append_str(*result, expanded);
+	return (ptr);
+}
 
-    if (*ptr == '?')
-        var_name[i++] = *ptr++;
-    else
-        while (ft_isalnum(*ptr) || *ptr == '_')
-            var_name[i++] = *ptr++;
-    var_name[i] = '\0';
+/**
+ * expand_word_token
+ *   Expand all `$...` in a single WORD token (not single-quoted).
+ */
+static void	expand_word_token(t_token *token, t_data *data)
+{
+	char	*result;
+	char	*ptr;
 
-    /* If it was `$?`, expand to last status; otherwise look up in env. */
-    char *expanded = (var_name[0] == '?' )
-        ? ft_itoa(data->last_status)
-        : expand_env_var(var_name, data->env);
-
-        *result = str_append_str(*result, expanded);
-    return ptr;
+	result = ft_strdup("");
+	ptr = token->value;
+	while (ptr && *ptr)
+	{
+		if (*ptr == '$')
+			ptr = expand_variable(&result, ptr, data);
+		else
+		{
+			result = str_append_char(result, *ptr);
+			ptr++;
+		}
+	}
+	free(token->value);
+	token->value = result;
 }
 
 /**
  * expand_tokens
- *   Walks every token in data->tokens[].  For each WORD that’s not SINGLE_QUOTE,
- *   repeatedly calls expand_variable (on any '$') and rebuilds token->value.
- *
- *   data: the shell data structure, with token_count + tokens[] filled by the lexer.
+ *   Walk every token and expand variables in unquoted WORDs.
  */
-void expand_tokens(t_data *data) {
-    for (int i = 0; i < data->token_count; i++) {
-        t_token *token = &data->tokens[i];
+void	expand_tokens(t_data *data)
+{
+	int		i;
+	t_token	*token;
 
-        /* skip non-WORDs and single-quoted WORDs */
-        if (token->type != WORD || token->quote == SINGLE_QUOTE)
-            continue;
-
-        char *result = ft_strdup("");
-        char *ptr = token->value;
-        
-        while (ptr && *ptr) {
-            if (*ptr == '$' && (token->quote != SINGLE_QUOTE)) {
-                ptr = expand_variable(&result, ptr, data);
-            } else {
-                result = str_append_char(result, *ptr);
-                ptr++;
-            }
-        }
-        
-        free(token->value);
-        token->value = result;
-    }
+	i = 0;
+	while (i < data->token_count)
+	{
+		token = &data->tokens[i];
+		if (token->type == WORD && token->quote != SINGLE_QUOTE)
+			expand_word_token(token, data);
+		i++;
+	}
 }

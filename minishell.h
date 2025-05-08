@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/22 17:52:08 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/04 15:27:26 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/05/08 14:05:20 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -142,7 +142,10 @@ char				*str_append_char(char *s, char c);
 char				*str_append_str(char *s, char *suffix);
 char				**ft_extend_arr(char **arr, char *new_str);
 void				ft_free_arr(char **arr);
-char				*expand_variable(char **result, char *ptr, t_data *data);
+int					check_redir_sequence(t_data *data, int *i);
+int					check_pipe_sequence(t_data *data, int *i,
+						int *prev_was_word);
+void				print_unexpected_token(t_token_type type);
 
 /* === Signals (signals.c) === */
 void				setup_signals(void);
