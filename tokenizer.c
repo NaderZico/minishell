@@ -1,12 +1,12 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   lexer.c                                            :+:      :+:    :+:   */
+/*   tokenizer.c                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/27 15:12:33 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/04 15:00:47 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/05/12 14:20:46 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -64,30 +64,33 @@ static t_quote update_quote_state(t_quote current, char c)
  *   delimiter (or errors out on unterminated), produces one WORD token
  *   with quote=SINGLE_QUOTE or DOUBLE_QUOTE.
  */
-static void handle_quotes(char *input, int *i, t_data *data)
+static void	handle_quotes(char *input, int *i, t_data *data)
 {
-    t_quote quote_type = (input[*i] == '\'') ? SINGLE_QUOTE : DOUBLE_QUOTE;
-    int start = ++(*i);
+	t_quote	quote_type;
+	int		start;
+	char	*value;
 
-    /* advance until matching ' or " */
-    while (input[*i] && input[*i] != quote_type_to_char(quote_type))
-        (*i)++;
-
-    char *value = ft_substr(input, start, *i - start);
-    if (input[*i])
-        (*i)++;
-    else
-    {
-        ft_putstr_fd("minishell: unterminated quote\n", 2);
-        free(value);
-        return;
-    }
-
-    data->tokens[data->token_count++] = (t_token){
-        .value = value,
-        .type  = WORD,
-        .quote = quote_type
-    };
+	if (input[*i] == '\'')
+		quote_type = SINGLE_QUOTE;
+	else
+		quote_type = DOUBLE_QUOTE;
+	(*i)++;
+	start = *i;
+	while (input[*i] && input[*i] != quote_type_to_char(quote_type))
+		(*i)++;
+	value = ft_substr(input, start, *i - start);
+	if (input[*i])
+		(*i)++;
+	else
+	{
+		ft_putstr_fd("minishell: unterminated quote\n", 2);
+		free(value);
+		return ;
+	}
+	data->tokens[data->token_count].value = value;
+	data->tokens[data->token_count].type = WORD;
+	data->tokens[data->token_count].quote = quote_type;
+	data->token_count++;
 }
 
 /**
@@ -142,7 +145,7 @@ static void handle_word(char *input, int *i, t_data *data)
 
 /**
  * tokenize_input
- *   Top‐level lexer: splits `input` into tokens[] up to MAX_TOKENS.
+ *   Top‐level tokenizer: splits `input` into tokens[] up to MAX_TOKENS.
  *   Returns 0 on success (we don’t use the return code for errors here).
  */
 int tokenize_input(char *input, t_data *data)

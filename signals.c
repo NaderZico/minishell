@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/25 19:32:58 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/04 14:09:17 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/05/12 14:36:31 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,7 +21,7 @@ int		rl_replace_line(const char *line, int clear_undo);
  *   Called on Ctrl-C in the interactive shell.  Prints a newline,
  *   resets the readline prompt, and sets an internal global to 130.
  */
-void sigint_handler(int sig)
+static void sigint_handler(int sig)
 {
     (void)sig;
     write(1, "\n", 1);
