@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/27 15:12:33 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/16 15:43:59 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/05/16 18:06:59 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -68,25 +68,31 @@ static int	ensure_token_capacity(t_data *data)
 static void	handle_quotes(char *input, int *i, t_data *data)
 {
 	t_quote	quote_type = (input[*i] == '\'') ? SINGLE_QUOTE : DOUBLE_QUOTE;
-	int		start      = ++(*i);
+	int		start = ++(*i); // Skip opening quote
 
+	// Find closing quote
 	while (input[*i] && input[*i] != quote_type_to_char(quote_type))
 		(*i)++;
+
+	// Handle unterminated quotes
 	if (!input[*i])
 	{
 		ft_putstr_fd("minishell: unterminated quote\n", 2);
 		data->syntax_error = 1;
 		return;
 	}
-	(*i)++; // skip closing quote
 
+	// Extract value between quotes (exclude quotes)
+	char *value = ft_substr(input, start, *i - start);
+	(*i)++; // Skip closing quote
+
+	// Add token
 	if (!ensure_token_capacity(data))
+	{
+		free(value);
 		return;
-	data->tokens[data->token_count++] = (t_token){
-		.value = ft_substr(input, start, *i - start - 1),
-		.type  = WORD,
-		.quote = quote_type
-	};
+	}
+	data->tokens[data->token_count++] = (t_token){value, WORD, quote_type};
 }
 
 static void	handle_word(char *input, int *i, t_data *data)
