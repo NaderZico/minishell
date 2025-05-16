@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/05/08 14:03:01 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/08 19:37:10 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/05/15 16:52:44 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -32,8 +32,7 @@ int	check_pipe_sequence(t_data *data, int *i, int *prev_was_word)
 	{
 		if (data->tokens[*i].type == PIPE)
 		{
-			if (!(*prev_was_word) || (*i + 1 < data->token_count
-					&& data->tokens[*i + 1].type == PIPE))
+			if (!(*prev_was_word) || (*i == data->token_count - 1))
 			{
 				print_unexpected_token(PIPE);
 				return (0);

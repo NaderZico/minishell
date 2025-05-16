@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/28 13:33:37 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/08 14:33:27 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/05/16 15:46:17 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -41,24 +41,63 @@ char	**ft_extend_arr(char **arr, char *new_str)
  *   Frees all dynamic memory in data->tokens and data->commands,
  *   including token->value, commands[].args[], commands[].redirs[].file.
  */
+// void	free_data(t_data *data)
+// {
+// 	int	i, j;
+
+// 	if (data->tokens)
+// 	{
+// 		i = -1;
+// 		while (++i < data->token_count)
+// 			free(data->tokens[i].value);
+// 		free(data->tokens);
+// 	}
+// 	data->token_count = data->token_cap = 0;
+// 	data->tokens = NULL;
+
+// 	if (data->commands)
+// 	{
+// 		i = -1;
+// 		while (++i < data->cmd_count)
+// 		{
+// 			ft_free_arr(data->commands[i].args);
+// 			j = -1;
+// 			while (++j < data->commands[i].redir_count)
+// 				free(data->commands[i].redirs[j].file);
+// 			free(data->commands[i].redirs);
+// 		}
+// 		free(data->commands);
+// 	}
+// 	data->cmd_count = data->cmd_cap = 0;
+// 	data->commands = NULL;
+// }
+
 void	free_data(t_data *data)
 {
-	int	i;
-	int	j;
-
-	i = -1;
-	while (++i < data->token_count)
-		free(data->tokens[i].value);
-	
-	i = -1;
-	while (++i < data->cmd_count)
+	// Free tokens
+	if (data->tokens)
 	{
-		ft_free_arr(data->commands[i].args);
-		j = -1;
-		while (++j < data->commands[i].redir_count)
-			free(data->commands[i].redirs[j].file);
-		free(data->commands[i].redirs);
+		for (int i = 0; i < data->token_count; i++)
+			free(data->tokens[i].value);
+		free(data->tokens);
+		data->tokens = NULL;
 	}
+	data->token_count = data->token_cap = 0;
+
+	// Free commands
+	if (data->commands)
+	{
+		for (int i = 0; i < data->cmd_count; i++)
+		{
+			ft_free_arr(data->commands[i].args);
+			for (int j = 0; j < data->commands[i].redir_count; j++)
+				free(data->commands[i].redirs[j].file);
+			free(data->commands[i].redirs);
+		}
+		free(data->commands);
+		data->commands = NULL;
+	}
+	data->cmd_count = data->cmd_cap = 0;
 }
 
 /**

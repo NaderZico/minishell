@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/27 14:53:55 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/12 14:21:11 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/05/16 15:50:33 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -50,9 +50,13 @@ static void debug_print_commands(t_data *data)
 int main(int argc, char **argv, char **envp)
 {
     t_data  data = {
+        .tokens = NULL,
         .token_count = 0,
-        .cmd_count   = 0,
-        .env         = envp,
+        .token_cap = 0,
+        .commands = NULL,
+        .cmd_count = 0,
+        .cmd_cap = 0,
+        .env = envp,
         .last_status = 0
     };
     char    *input;
@@ -63,6 +67,7 @@ int main(int argc, char **argv, char **envp)
 
     while (1)
     {
+        data.syntax_error = 0;
         input = readline("minishell> ");
         if (!input)
         {
@@ -73,7 +78,7 @@ int main(int argc, char **argv, char **envp)
         if (*input)
         {
             add_history(input);
-            if (tokenize_input(input, &data) == 0
+            if (tokenize_input(input, &data) == 0 && !data.syntax_error
                 && validate_syntax(&data))
             {
                 // Debug dump: raw tokens

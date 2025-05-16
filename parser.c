@@ -6,91 +6,82 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/24 17:55:32 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/08 14:14:13 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/05/16 15:45:10 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "minishell.h"
 
-/**
- * Adds a redirection to the current command.
- *
- * This function reallocates the command's redirection array to accommodate
- * a new redirection, copies existing redirections into the new array,
- * appends the new redirection (based on the current token and the next one),
- * and updates the command's redirection count.
- */
+static int	ensure_command_capacity(t_data *data, int cmd_idx)
+{
+	if (cmd_idx >= data->cmd_cap)
+	{
+		int			new_cap = data->cmd_cap * 2;
+		t_command	*new_commands;
+
+		if (data->cmd_cap == 0)
+			new_cap = 16;
+		new_commands = (t_command *)safe_malloc(sizeof(t_command) * new_cap);
+		if (data->commands)
+		{
+			ft_memcpy(new_commands, data->commands, sizeof(t_command) * data->cmd_count);
+			free(data->commands);
+		}
+		for (int i = data->cmd_count; i < new_cap; i++)
+			new_commands[i] = (t_command){NULL, NULL, 0, 0, 0};
+		data->commands = new_commands;
+		data->cmd_cap = new_cap;
+	}
+	return (1);
+}
+
 static int	add_redirection(t_command *cmd, t_data *data, int *i)
 {
-	t_redir	*new_redirs;
-	int		j;
+	if (*i + 1 >= data->token_count || data->tokens[*i + 1].type != WORD)
+	{
+		print_unexpected_token(data->tokens[*i].type);
+		return (1);  // Return error if no file after redirection
+	}
+	t_redir	*new_redirs = (t_redir *)safe_malloc(sizeof(t_redir) * (cmd->redir_count + 1));
 
-	// Allocate space for one more redirection.
-	new_redirs = safe_malloc(sizeof(t_redir) * (cmd->redir_count + 1));
-
-	// Copy existing redirections into the new array.
-	j = -1;
-	while (++j < cmd->redir_count)
-		new_redirs[j] = cmd->redirs[j];
-
-	// Add the new redirection (type and target file).
-	new_redirs[cmd->redir_count].type = data->tokens[*i].type;
-	new_redirs[cmd->redir_count].file = ft_strdup(data->tokens[*i + 1].value);
-
-	// Replace the old redirection array with the new one.
+	ft_memcpy(new_redirs, cmd->redirs, sizeof(t_redir) * cmd->redir_count);
+	new_redirs[cmd->redir_count] = (t_redir){
+		.file = ft_strdup(data->tokens[*i + 1].value),
+		.type = data->tokens[*i].type
+	};
 	free(cmd->redirs);
 	cmd->redirs = new_redirs;
 	cmd->redir_count++;
-
-	// Skip over redirection token and its target.
 	*i += 2;
 	return (0);
 }
 
-/**
- * Parses the list of tokens into an array of command structures.
- *
- * This function reads the tokens, splits them into commands (based on PIPE tokens),
- * adds redirections when detected, and collects arguments.
- *
- * All parsed commands and their data are stored in `data->commands`,
- * and the total number of parsed commands is stored in `data->cmd_count`.
- */
 int	parse_tokens(t_data *data)
 {
 	int	cmd_idx = 0;
 	int	i = 0;
 
 	data->cmd_count = 0;
-
-	while (i < data->token_count && cmd_idx < MAX_COMMANDS)
+	free(data->commands);
+	data->commands = NULL;
+	data->cmd_cap = 0;
+	while (i < data->token_count)
 	{
-		data->commands[cmd_idx].args = NULL;
-		data->commands[cmd_idx].redirs = NULL;
-		data->commands[cmd_idx].redir_count = 0;
-
-		// Parse the tokens for the current command until a PIPE or end is reached.
+		if (!ensure_command_capacity(data, cmd_idx))
+			break ;
+		data->commands[cmd_idx] = (t_command){NULL, NULL, 0, 0, 0};
 		while (i < data->token_count && data->tokens[i].type != PIPE)
 		{
-			// Handle redirection token and target.
 			if (data->tokens[i].type >= REDIR_IN)
 				add_redirection(&data->commands[cmd_idx], data, &i);
 			else
-			{
-				// Add token to argument list.
 				data->commands[cmd_idx].args = ft_extend_arr(
 					data->commands[cmd_idx].args, data->tokens[i++].value);
-			}
 		}
-
-		// Skip the PIPE token if present.
 		if (i < data->token_count && data->tokens[i].type == PIPE)
 			i++;
-
-		// Move to the next command slot.
 		cmd_idx++;
 	}
-
 	data->cmd_count = cmd_idx;
 	return (0);
 }
