@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/28 14:32:31 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/16 18:18:27 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/05/17 13:47:46 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -66,18 +66,12 @@ static int	check_delimiter_sequences(t_data *data)
 
 int	validate_syntax(t_data *data)
 {
-	/* Built-in “empty quoted word” before anything else: */
-	if (data->token_count == 1
-	 && data->tokens[0].type == WORD
-	 && data->tokens[0].quote != NO_QUOTE
-	 && data->tokens[0].value[0] == '\0')
-	{
-		/* exactly: minishell: : command not found */
-		ft_putstr_fd("minishell: ", 2);
-		ft_putstr_fd("", 2);
-		ft_putstr_fd(": command not found\n", 2);
-		return (0);
-	}
+	if (data->token_count == 1 && data->tokens[0].type == WORD
+        && data->tokens[0].value[0] == '\0')
+    {
+        ft_putstr_fd("minishell: command not found\n", 2);
+        return (0);
+    }
 
 	if (!check_pipes(data)
 	 || !check_redirs(data)

@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/25 19:32:58 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/16 16:31:00 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/05/17 13:25:42 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,7 +14,7 @@
 
 volatile sig_atomic_t	g_signal = 0;
 
-int						rl_replace_line(const char *line, int clear_undo);
+// int						rl_replace_line(const char *line, int clear_undo);
 
 /**
  * sigint_handler

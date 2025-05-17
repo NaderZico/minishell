@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/28 13:33:37 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/16 15:46:17 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/05/17 13:46:59 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,23 +17,25 @@
  *   Appends new_str to a NULL-terminated array of strings,
  *   returns the new malloc’d array.
  */
-char	**ft_extend_arr(char **arr, char *new_str)
+char **ft_extend_arr(char **arr, char *new_str)
 {
-	char	**new;
-	int		count;
-	int		i;
+    char **new;
+    int count = 0;
 
-	count = 0;
-	while (arr && arr[count])
-		count++;
-	new = safe_malloc(sizeof(char *) * (count + 2));
-	i = -1;
-	while (++i < count)
-		new[i] = arr[i];
-	new[count] = ft_strdup(new_str);
-	new[count + 1] = NULL;
-	free(arr);
-	return (new);
+    // Count existing elements
+    while (arr && arr[count])
+        count++;
+
+    new = safe_malloc(sizeof(char *) * (count + 2));
+    for (int i = 0; i < count; i++)
+        new[i] = arr[i]; // Copy existing pointers
+
+    new[count] = ft_strdup(new_str); // Duplicate new_str
+    new[count + 1] = NULL;
+
+    if (arr)
+        free(arr); // Free the old array (not its contents)
+    return (new);
 }
 
 /**
@@ -72,32 +74,34 @@ char	**ft_extend_arr(char **arr, char *new_str)
 // 	data->commands = NULL;
 // }
 
-void	free_data(t_data *data)
+void free_data(t_data *data)
 {
-	// Free tokens
-	if (data->tokens)
-	{
-		for (int i = 0; i < data->token_count; i++)
-			free(data->tokens[i].value);
-		free(data->tokens);
-		data->tokens = NULL;
-	}
-	data->token_count = data->token_cap = 0;
+    // Free tokens
+    if (data->tokens)
+    {
+        for (int i = 0; i < data->token_count; i++)
+            free(data->tokens[i].value);
+        free(data->tokens);
+        data->tokens = NULL;
+    }
+    data->token_count = 0;
+    data->token_cap = 0;
 
-	// Free commands
-	if (data->commands)
-	{
-		for (int i = 0; i < data->cmd_count; i++)
-		{
-			ft_free_arr(data->commands[i].args);
-			for (int j = 0; j < data->commands[i].redir_count; j++)
-				free(data->commands[i].redirs[j].file);
-			free(data->commands[i].redirs);
-		}
-		free(data->commands);
-		data->commands = NULL;
-	}
-	data->cmd_count = data->cmd_cap = 0;
+    // Free commands
+    if (data->commands)
+    {
+        for (int i = 0; i < data->cmd_count; i++)
+        {
+            ft_free_arr(data->commands[i].args);
+            for (int j = 0; j < data->commands[i].redir_count; j++)
+                free(data->commands[i].redirs[j].file);
+            free(data->commands[i].redirs);
+        }
+        free(data->commands);
+        data->commands = NULL;
+    }
+    data->cmd_count = 0;
+    data->cmd_cap = 0;
 }
 
 /**

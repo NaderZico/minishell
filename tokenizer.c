@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/27 15:12:33 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/16 18:06:59 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/05/17 13:36:20 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -178,10 +178,11 @@ int	tokenize_input(char *input, t_data *data)
 {
 	int	i;
 
-	// reset
-	free(data->tokens);
-	data->tokens    = NULL;
-	data->token_cap = data->token_count = 0;
+	// // reset
+	// free(data->tokens);
+	// data->tokens    = NULL;
+	// data->token_cap = data->token_count = 0;
+	free_data(data);
 
 	i = 0;
 	while (input[i])
