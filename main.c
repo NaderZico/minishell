@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/27 14:53:55 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/17 13:49:39 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/05/17 19:57:10 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -47,59 +47,70 @@
 //     }
 // }
 
-int main(int argc, char **argv, char **envp)
+#include "minishell.h"
+
+static void	cleanup_and_exit(t_data *data, int exit_code)
 {
-    t_data  data = {
-        .tokens = NULL,
-        .token_count = 0,
-        .token_cap = 0,
-        .commands = NULL,
-        .cmd_count = 0,
-        .cmd_cap = 0,
-        .env = envp,
-        .last_status = 0
-    };
-    char    *input;
+    free_data(data);
+    clear_history();
+    exit(exit_code);
+}
+
+int	main(int argc, char **argv, char **envp)
+{
+    t_data	data = {0};  // Initialize all fields to 0/NULL
+    char	*input;
 
     (void)argc;
     (void)argv;
+    data.env = envp;
     setup_signals();
 
     while (1)
     {
         data.syntax_error = 0;
         input = readline("minishell> ");
-        if (!input)
+
+        /* Handle signals */
+        if (g_signal)
+        {
+            data.last_status = g_signal;  // Capture signal value
+            g_signal = 0;                 // Reset signal flag
+            if (!input)                   // Handle EOF after signal
+                write(1, "exit\n", 5);
+        }
+
+        if (!input)  // EOF (Ctrl-D)
         {
             write(1, "exit\n", 5);
-            /* free everything before actually exiting */
-            clear_history();
-            free_data(&data);
             break;
         }
 
         if (*input)
         {
             add_history(input);
-            if (tokenize_input(input, &data) == 0 && !data.syntax_error
-                && validate_syntax(&data))
+            t_error err = tokenize_input(input, &data);
+            if (err != SUCCESS)
             {
-                // Debug dump: raw tokens
-                // debug_print_tokens(&data);
-
-                // Expand $vars, then parse into commands
-                expand_tokens(&data);
-
-                // if (parse_tokens(&data) == 0)
-                // {
-                //         debug_print_commands(&data);
-                //         execute_here();
-                // }
-
+                handle_error(err, &data, "tokenization");
+                free(input);
+                free_data(&data);
+                continue;
             }
-            free(input);
-            free_data(&data);
+            else if (!validate_syntax(&data))
+                handle_error(ERR_SYNTAX, &data, NULL);
+            else
+            {
+                err = expand_tokens(&data);
+                if (err != SUCCESS)
+                    handle_error(err, &data, "expand");
+                else if ((err = parse_tokens(&data)) != SUCCESS)
+                    handle_error(err, &data, "parse");
+                // else execute_commands(&data);
+            }
         }
+        free(input);
+        free_data(&data);
     }
-    return (0);
+    cleanup_and_exit(&data, data.last_status);
 }

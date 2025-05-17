@@ -6,7 +6,7 @@
 #    By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/04/23 15:41:33 by nakhalil          #+#    #+#              #
-#    Updated: 2025/05/16 14:45:23 by nakhalil         ###   ########.fr        #
+#    Updated: 2025/05/17 15:32:56 by nakhalil         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -27,19 +27,13 @@ SRCS = main.c \
 	parser.c \
 	signals.c \
 	utils.c \
+	utils_free.c \
 	expander.c \
 	syntax_check.c \
 	syntax_utils.c
 
 # Object files in build/
-OBJS = $(BUILDDIR)/main.o \
-	$(BUILDDIR)/tokenizer.o \
-	$(BUILDDIR)/parser.o \
-	$(BUILDDIR)/signals.o \
-	$(BUILDDIR)/utils.o \
-	$(BUILDDIR)/expander.o \
-	$(BUILDDIR)/syntax_check.o \
-	$(BUILDDIR)/syntax_utils.o
+OBJS = $(SRCS:%.c=$(BUILDDIR)/%.o)
 
 # Includes and libraries
 INCLUDES = -I. -I./libft

@@ -6,15 +6,11 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/27 15:12:33 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/17 13:36:20 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/05/17 20:24:42 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "minishell.h"
-
-/*──────────────────────────────────────────────────────────────────────────*/
-/*                            Helper Functions                             */
-/*──────────────────────────────────────────────────────────────────────────*/
 
 static int	ft_isspace(char c)
 {
@@ -40,163 +36,140 @@ static t_quote	update_quote_state(t_quote current, char c)
 	return (current);
 }
 
-static int	ensure_token_capacity(t_data *data)
+static t_error ensure_token_capacity(t_data *data)
 {
-	if (data->token_count >= data->token_cap)
-	{
-		int			new_cap = data->token_cap ? data->token_cap * 2 : 16;
-		t_token		*new_tokens;
+    int new_cap = data->token_cap ? data->token_cap * 2 : 16;
 
-		new_tokens = safe_malloc(sizeof(t_token) * new_cap);
-		if (data->tokens)
-		{
-			ft_memcpy(new_tokens, data->tokens,
-			          sizeof(t_token) * data->token_count);
-			free(data->tokens);
-		}
-		data->tokens    = new_tokens;
-		data->token_cap = new_cap;
-	}
-	return (1);
+    if (data->token_count >= data->token_cap)
+    {
+        // grow the tokens[] array with ft_realloc (exits on failure)
+        data->tokens = ft_realloc(
+            data->tokens,
+            data->token_cap * sizeof *data->tokens,
+            new_cap * sizeof *data->tokens
+        );
+        data->token_cap = new_cap;
+    }
+    return (SUCCESS);
 }
 
-/*──────────────────────────────────────────────────────────────────────────*/
-/*                         Token-handling Functions                        */
-/*──────────────────────────────────────────────────────────────────────────*/
-
-// 1) Quotes: consume from opening ' or " up to matching close.
-static void	handle_quotes(char *input, int *i, t_data *data)
+static t_error add_token(t_data *data, char *value, t_token_type type, t_quote quote)
 {
-	t_quote	quote_type = (input[*i] == '\'') ? SINGLE_QUOTE : DOUBLE_QUOTE;
-	int		start = ++(*i); // Skip opening quote
+    ensure_token_capacity(data); // No error check needed; safe_malloc exits on failure
 
-	// Find closing quote
-	while (input[*i] && input[*i] != quote_type_to_char(quote_type))
-		(*i)++;
+    // Handle operator token values
+    if (type != WORD && !value)
+    {
+        if (type == PIPE)
+            value = ft_strdup("|");
+        else if (type == REDIR_IN)
+            value = ft_strdup("<");
+        else if (type == REDIR_OUT)
+            value = ft_strdup(">");
+        else if (type == REDIR_APPEND)
+            value = ft_strdup(">>");
+        else if (type == REDIR_HEREDOC)
+            value = ft_strdup("<<");
+        
+        if (!value)
+            return (ERR_MALLOC);
+    }
 
-	// Handle unterminated quotes
-	if (!input[*i])
-	{
-		ft_putstr_fd("minishell: unterminated quote\n", 2);
-		data->syntax_error = 1;
-		return;
-	}
-
-	// Extract value between quotes (exclude quotes)
-	char *value = ft_substr(input, start, *i - start);
-	(*i)++; // Skip closing quote
-
-	// Add token
-	if (!ensure_token_capacity(data))
-	{
-		free(value);
-		return;
-	}
-	data->tokens[data->token_count++] = (t_token){value, WORD, quote_type};
+    data->tokens[data->token_count++] = (t_token){value, type, quote};
+    return (SUCCESS);
 }
 
-static void	handle_word(char *input, int *i, t_data *data)
+static t_error handle_quotes(char *input, int *i, t_data *data)
 {
-	int		start = *i;
-	t_quote	quote = NO_QUOTE;
-	char	*value;
+    t_quote quote_type = (input[*i] == '\'') ? SINGLE_QUOTE : DOUBLE_QUOTE;
+    int start = ++(*i);
 
-	while (input[*i] && ((quote != NO_QUOTE) || 
-	(!ft_isspace(input[*i]) && !ft_strchr("|<>", input[*i]))))
-{
-	if ((input[*i] == '\'' || input[*i] == '"') && quote == NO_QUOTE)
-		quote = update_quote_state(quote, input[*i]);
-	else if (input[*i] == quote_type_to_char(quote))
-		quote = update_quote_state(quote, input[*i]);
-	(*i)++;
-}
-	value = ft_substr(input, start, *i - start);
-	if (!value || !ensure_token_capacity(data))
-	{
-		free(value);
-		return;
-	}
-	data->tokens[data->token_count++] = (t_token){value, WORD, NO_QUOTE};
+    while (input[*i] && input[*i] != quote_type_to_char(quote_type))
+        (*i)++;
+    if (!input[*i])
+    {
+        ft_putstr_fd("minishell: unterminated quote\n", 2);
+        data->syntax_error = 1;
+        return (ERR_SYNTAX);
+    }
+    char *value = ft_substr(input, start, *i - start);
+    if (!value)
+        return (ERR_MALLOC);
+    (*i)++;
+    return add_token(data, value, WORD, quote_type);
 }
 
-// 3) Pipes: a single '|' becomes a PIPE token.
-static void	handle_pipe(char *input, int *i, t_data *data)
+static t_error handle_word(char *input, int *i, t_data *data)
 {
-	(void)input;  // unused
-	if (!ensure_token_capacity(data))
-		return;
-	data->tokens[data->token_count++] = (t_token){
-		.value = ft_strdup("|"),
-		.type  = PIPE,
-		.quote = NO_QUOTE
-	};
-	(*i)++;
+    int start = *i;
+    t_quote quote = NO_QUOTE;
+    char *value;
+
+    while (input[*i] && ( 
+        (quote != NO_QUOTE) || 
+        (!ft_isspace(input[*i]) && !ft_strchr("|<>", input[*i]))
+    ))
+    {
+        if ((input[*i] == '\'' || input[*i] == '"') && quote == NO_QUOTE)
+            quote = update_quote_state(quote, input[*i]);
+        else if (input[*i] == quote_type_to_char(quote))
+            quote = update_quote_state(quote, input[*i]);
+        (*i)++;
+    }
+    value = ft_substr(input, start, *i - start);
+    if (!value)
+        return (ERR_MALLOC);
+    return add_token(data, value, WORD, NO_QUOTE);
 }
 
-// 4) Redirections: <, <<, >, >> become the proper REDIR_* token.
-static void	handle_redirection(char *input, int *i, t_data *data)
+static t_error handle_pipe(char *input, int *i, t_data *data)
 {
-	t_token_type	type;
-
-	if (input[*i] == '<')
-	{
-		(*i)++;
-		if (input[*i] == '<')
-		{
-			type = REDIR_HEREDOC;
-			(*i)++;
-		}
-		else
-			type = REDIR_IN;
-	}
-	else // '>'
-	{
-		(*i)++;
-		if (input[*i] == '>')
-		{
-			type = REDIR_APPEND;
-			(*i)++;
-		}
-		else
-			type = REDIR_OUT;
-	}
-
-	if (!ensure_token_capacity(data))
-		return;
-	data->tokens[data->token_count++] = (t_token){
-		.value = NULL,
-		.type  = type,
-		.quote = NO_QUOTE
-	};
+    (void)input;
+    char *pipe_str = ft_strdup("|");
+    if (!pipe_str)
+        return (ERR_MALLOC);
+    t_error err = add_token(data, pipe_str, PIPE, NO_QUOTE);
+    if (err != SUCCESS)
+        free(pipe_str);
+    (*i)++;
+    return err;
 }
 
-/*──────────────────────────────────────────────────────────────────────────*/
-/*                         Main Tokenizer Entry                           */
-/*──────────────────────────────────────────────────────────────────────────*/
-
-int	tokenize_input(char *input, t_data *data)
+static t_error handle_redirection(char *input, int *i, t_data *data)
 {
-	int	i;
+    t_token_type type;
 
-	// // reset
-	// free(data->tokens);
-	// data->tokens    = NULL;
-	// data->token_cap = data->token_count = 0;
-	free_data(data);
+    if (input[*i] == '<')
+    {
+        (*i)++;
+        type = (input[*i] == '<') ? (++(*i), REDIR_HEREDOC) : REDIR_IN;
+    }
+    else
+    {
+        (*i)++;
+        type = (input[*i] == '>') ? (++(*i), REDIR_APPEND) : REDIR_OUT;
+    }
+    return add_token(data, NULL, type, NO_QUOTE);
+}
 
-	i = 0;
-	while (input[i])
-	{
-		if (ft_isspace(input[i]))
-			i++;
-		else if (input[i] == '\'' || input[i] == '"')
-			handle_quotes(input, &i, data);
-		else if (input[i] == '|')
-			handle_pipe(input, &i, data);
-		else if (input[i] == '<' || input[i] == '>')
-			handle_redirection(input, &i, data);
-		else
-			handle_word(input, &i, data);
-	}
-	return (0);
+t_error tokenize_input(char *input, t_data *data)
+{
+    int i = 0;
+    t_error err = SUCCESS;
+
+    free_tokens(data);
+    while (input[i] && err == SUCCESS)
+    {
+        if (ft_isspace(input[i]))
+            i++;
+        else if (input[i] == '\'' || input[i] == '"')
+            err = handle_quotes(input, &i, data);
+        else if (input[i] == '|')
+            err = handle_pipe(input, &i, data);
+        else if (input[i] == '<' || input[i] == '>')
+            err = handle_redirection(input, &i, data);
+        else
+            err = handle_word(input, &i, data);
+    }
+    return (err == SUCCESS && data->syntax_error) ? ERR_SYNTAX : err;
 }
