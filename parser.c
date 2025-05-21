@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/24 17:55:32 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/17 19:33:11 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/05/21 17:42:15 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -61,8 +61,7 @@ t_error parse_tokens(t_data *data)
 
     while (i < data->token_count)
     {
-        if (ensure_command_capacity(data, cmd_idx) != SUCCESS)
-            return (ERR_MALLOC);
+        ensure_command_capacity(data, cmd_idx);
         data->commands[cmd_idx] = (t_command){NULL, NULL, 0, 0, 0};
 
         while (i < data->token_count && data->tokens[i].type != PIPE)
@@ -79,8 +78,6 @@ t_error parse_tokens(t_data *data)
                     data->commands[cmd_idx].args,
                     data->tokens[i++].value
                 );
-                if (!data->commands[cmd_idx].args)
-                    return (ERR_MALLOC);
             }
         }
         if (i < data->token_count && data->tokens[i].type == PIPE)
