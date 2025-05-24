@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/28 13:33:37 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/21 20:18:40 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/05/24 18:38:34 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -91,13 +91,14 @@ void	append_char(char **buf, size_t *cap, size_t *len, char c)
 
 void	handle_error(t_error err, t_data *data, char *context)
 {
-	const char	*tok_val;
+		const char *tok_val = data->tokens[data->error_pos].value;
 
 	if (err == ERR_SYNTAX)
 	{
-		/* print only the unexpected-token message */
-		tok_val = data->tokens[data->error_pos].value;
-		print_unexpected_token(tok_val);
+		ft_putstr_fd("minishell: syntax error near unexpected token `",
+			STDERR_FILENO);
+		ft_putstr_fd((char *)tok_val, STDERR_FILENO);
+		ft_putstr_fd("'\n", STDERR_FILENO);
 	}
 	else
 	{

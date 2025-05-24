@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/22 17:52:08 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/21 20:18:55 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/05/24 16:23:19 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -109,7 +109,7 @@ void		free_data(t_data *data);
 void		ft_free_arr(char **arr);
 
 /* syntax check */
-void		print_unexpected_token(const char *token);
+void	print_unexpected_token(t_token_type type);
 t_error		check_pipe_sequence(t_data *data, int *i, int *prev);
 t_error		check_redir_sequence(t_data *data, int *i);
 
