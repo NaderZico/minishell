@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/28 14:32:31 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/24 18:38:38 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/07/11 16:26:36 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -22,7 +22,10 @@ static t_error	check_pipes(t_data *data)
 	if (data->tokens[0].type == PIPE
 		|| data->tokens[data->token_count - 1].type == PIPE)
 	{
-		data->error_pos = (data->tokens[0].type == PIPE) ? 0 : data->token_count - 1;
+		if (data->tokens[0].type == PIPE)
+			data->error_pos = 0;
+		else
+			data->error_pos = data->token_count - 1;
 		return (ERR_SYNTAX);
 	}
 	prev = 1;

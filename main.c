@@ -1,11 +1,11 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   main.c                                             :+:      :+:    :+:   */
+/*   main.c                                             :+:      :+:    :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/04/27 14:53:55 by nakhalil          #+#    #+#             */
+/*   Created: 2025/04/27 14:53:55 by nakhalil          #+#             */
 /*   Updated: 2025/05/21 20:35:05 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
@@ -19,8 +19,12 @@
 //     for (int i = 0; i < data->token_count; i++)
 //     {
 //         t_token *tok = &data->tokens[i];
-//         printf("   token[%d]: type=%d, quote=%d, value=\"%s\"\n",
-//                i, tok->type, tok->quote, tok->value ? tok->value : "NULL");
+//         printf("   token[%d]: type=%d, quote=%d, value=\"", i, tok->type, tok->quote);
+//         if (tok->value)
+//             printf("%s", tok->value);
+//         else
+//             printf("NULL");
+//         printf("\"\n");
 //     }
 // }
 
@@ -70,13 +74,11 @@ int	main(int argc, char **argv, char **envp)
 	while (1)
 	{
 		data.syntax_error = 0;
-		input = readline("minishell> ");
+		input = readline("minishell$ ");
 		if (g_signal)
 		{
 			data.last_status = g_signal;
 			g_signal = 0;
-			if (!input)
-				write(1, "exit\n", 5);
 		}
 		if (!input)
 		{

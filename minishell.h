@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/22 17:52:08 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/24 16:23:19 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/07/13 12:58:47 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -85,7 +85,7 @@ typedef struct s_data
 	char			**env;
 	int				last_status;
 	int				syntax_error;
-	int				error_pos;      /* index of the bad token */
+	int				error_pos;
 }				t_data;
 
 /* core */
@@ -116,5 +116,12 @@ t_error		check_redir_sequence(t_data *data, int *i);
 /* readline integration */
 int			rl_replace_line(const char *text, int clear_undo);
 void		rl_redisplay(void);
+
+/* tokenizer helpers */
+int			ft_isspace(char c);
+char		quote_type_to_char(t_quote type);
+t_quote		update_quote_state(t_quote current, char c);
+t_error		ensure_token_capacity(t_data *data);
+t_error		add_token(t_data *data, char *value, t_token_type type, t_quote quote);
 
 #endif

@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/24 17:55:32 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/21 20:05:59 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/07/11 16:26:44 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,11 +23,8 @@ static t_error	ensure_command_capacity(t_data *data, int cmd_idx)
 		new_cap = data->cmd_cap * 2;
 	else
 		new_cap = 16;
-	data->commands = ft_realloc(
-		data->commands,
-		data->cmd_cap * sizeof *data->commands,
-		new_cap * sizeof *data->commands
-	);
+	data->commands = ft_realloc(data->commands, data->cmd_cap
+			* sizeof *data->commands, new_cap * sizeof *data->commands);
 	i = data->cmd_cap;
 	while (i < new_cap)
 	{
@@ -42,30 +39,26 @@ static t_error	add_redirection(t_command *cmd, t_data *data, int *i)
 {
 	char	*file;
 
-	if (*i + 1 >= data->token_count
-		|| data->tokens[*i + 1].type != WORD)
+	if (*i + 1 >= data->token_count || data->tokens[*i + 1].type != WORD)
 	{
 		print_unexpected_token(data->tokens[*i].type);
 		return (ERR_SYNTAX);
 	}
-	cmd->redirs = ft_realloc(
-		cmd->redirs,
-		cmd->redir_count * sizeof *cmd->redirs,
-		(cmd->redir_count + 1) * sizeof *cmd->redirs
-	);
+	cmd->redirs = ft_realloc(cmd->redirs, cmd->redir_count
+			* sizeof *cmd->redirs, (cmd->redir_count + 1)
+			* sizeof *cmd->redirs);
 	file = ft_strdup(data->tokens[*i + 1].value);
 	if (!file)
 		return (ERR_MALLOC);
-	cmd->redirs[cmd->redir_count++] = (t_redir){file,
-		data->tokens[*i].type};
+	cmd->redirs[cmd->redir_count++] = (t_redir){file, data->tokens[*i].type};
 	*i += 2;
 	return (SUCCESS);
 }
 
 t_error	parse_tokens(t_data *data)
 {
-	int	cmd_idx;
-	int	i;
+	int		cmd_idx;
+	int		i;
 	t_error	err;
 
 	free_commands(data);
@@ -80,14 +73,11 @@ t_error	parse_tokens(t_data *data)
 		while (i < data->token_count && data->tokens[i].type != PIPE)
 		{
 			if (data->tokens[i].type >= REDIR_IN)
-				err = add_redirection(&data->commands[cmd_idx],
-					data, &i);
+				err = add_redirection(&data->commands[cmd_idx], data, &i);
 			else
 			{
-				data->commands[cmd_idx].args = ft_extend_arr(
-					data->commands[cmd_idx].args,
-					data->tokens[i++].value
-				);
+				data->commands[cmd_idx].args = ft_extend_arr(data->commands[cmd_idx].args,
+						data->tokens[i++].value);
 				err = SUCCESS;
 			}
 			if (err != SUCCESS)

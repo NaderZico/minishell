@@ -6,7 +6,7 @@
 #    By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/04/23 15:41:33 by nakhalil          #+#    #+#              #
-#    Updated: 2025/05/17 15:32:56 by nakhalil         ###   ########.fr        #
+#    Updated: 2025/07/11 15:42:27 by nakhalil         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -24,6 +24,7 @@ LIBFT_DIR = ./libft
 # Source files (explicitly listed)
 SRCS = main.c \
 	tokenizer.c \
+	tokenizer_helper.c \
 	parser.c \
 	signals.c \
 	utils.c \

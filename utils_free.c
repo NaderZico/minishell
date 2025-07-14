@@ -6,11 +6,26 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/05/17 15:23:54 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/21 19:46:58 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/07/13 13:09:18 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "minishell.h"
+
+void	ft_free_arr(char **arr)
+{
+	int	i;
+
+	if (!arr)
+		return ;
+	i = 0;
+	while (arr[i])
+	{
+		free(arr[i]);
+		i++;
+	}
+	free(arr);
+}
 
 void	free_tokens(t_data *data)
 {
@@ -26,9 +41,9 @@ void	free_tokens(t_data *data)
 		}
 		free(data->tokens);
 	}
-	data->tokens     = NULL;
+	data->tokens = NULL;
 	data->token_count = 0;
-	data->token_cap   = 0;
+	data->token_cap = 0;
 }
 
 void	free_commands(t_data *data)
@@ -55,26 +70,11 @@ void	free_commands(t_data *data)
 	}
 	data->commands = NULL;
 	data->cmd_count = 0;
-	data->cmd_cap   = 0;
+	data->cmd_cap = 0;
 }
 
 void	free_data(t_data *data)
 {
 	free_tokens(data);
 	free_commands(data);
-}
-
-void	ft_free_arr(char **arr)
-{
-	int	i;
-
-	if (!arr)
-		return ;
-	i = 0;
-	while (arr[i])
-	{
-		free(arr[i]);
-		i++;
-	}
-	free(arr);
 }

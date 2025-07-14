@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/28 14:25:55 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/21 20:02:42 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/07/14 17:02:04 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -42,6 +42,7 @@ t_error	expand_tokens(t_data *data)
 	char	*name;
 	char	*val;
 	size_t	j;
+	char	next;
 
 	i = 0;
 	while (i < (size_t)data->token_count)
@@ -61,25 +62,30 @@ t_error	expand_tokens(t_data *data)
 			{
 				if (!quote && (src[j] == '"' || src[j] == '\''))
 				{
-					quote = src[j++];
-					continue;
+					quote = src[j];
+					j++;
+					continue ;
 				}
 				if (quote && src[j] == quote)
 				{
 					quote = 0;
 					j++;
-					continue;
+					continue ;
 				}
 				if (src[j] == '$' && quote != '\'')
 				{
-					char next = src[j + 1];
-					if (next == '\0'
-						|| (next != '?'
-							&& !ft_isalnum(next)
-							&& next != '_'))
+					next = src[j + 1];
+					if (next == '\0')
 					{
-						append_char(&buf, &cap, &len, src[j++]);
-						continue;
+						append_char(&buf, &cap, &len, src[j]);
+						j++;
+						continue ;
+					}
+					else if (next != '?' && !ft_isalnum(next) && next != '_')
+					{
+						append_char(&buf, &cap, &len, src[j]);
+						j++;
+						continue ;
 					}
 					j++;
 					if (src[j] == '?')
@@ -92,10 +98,10 @@ t_error	expand_tokens(t_data *data)
 						}
 						start = 0;
 						while (num[start])
-							append_char(&buf, &cap, &len, num[start++]);
+							append_char(&buf, &cap, &len, num[start]);
 						free(num);
 						j++;
-						continue;
+						continue ;
 					}
 					start = j;
 					while (src[j] && (ft_isalnum(src[j]) || src[j] == '_'))
@@ -109,11 +115,18 @@ t_error	expand_tokens(t_data *data)
 					val = get_env_value(name, data->env);
 					free(name);
 					start = 0;
-					while (val && val[start])
-						append_char(&buf, &cap, &len, val[start++]);
-					continue;
+					if (val)
+					{
+						while (val[start])
+						{
+							append_char(&buf, &cap, &len, val[start]);
+							start++;
+						}
+					}
+					continue ;
 				}
-				append_char(&buf, &cap, &len, src[j++]);
+				append_char(&buf, &cap, &len, src[j]);
+				j++;
 			}
 			buf[len] = '\0';
 			free(data->tokens[i].value);

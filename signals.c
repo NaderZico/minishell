@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/25 19:32:58 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/21 20:06:14 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/07/14 13:21:25 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -26,21 +26,22 @@ static void	sigint_handler(int sig)
 
 void	setup_signals(void)
 {
-	struct sigaction	sa;
-	struct sigaction	sa_quit;
+	struct sigaction	sa_sigint;
+	struct sigaction	sa_sigquit;
 
-	sa.sa_handler = sigint_handler;
-	sa.sa_flags = SA_RESTART;
-	sigemptyset(&sa.sa_mask);
-	if (sigaction(SIGINT, &sa, NULL) < 0)
+	sa_sigint.sa_handler = sigint_handler;
+	sa_sigint.sa_flags = SA_RESTART;
+	sigemptyset(&sa_sigint.sa_mask);
+	if (sigaction(SIGINT, &sa_sigint, NULL) < 0)
 	{
 		ft_putstr_fd("minishell: sigaction SIGINT failed\n", 2);
 		exit(EXIT_FAILURE);
 	}
-	sa_quit.sa_handler = SIG_IGN;
-	sa_quit.sa_flags = 0;
-	sigemptyset(&sa_quit.sa_mask);
-	if (sigaction(SIGQUIT, &sa_quit, NULL) < 0)
+
+	sa_sigquit.sa_handler = SIG_IGN;
+	sa_sigquit.sa_flags = 0;
+	sigemptyset(&sa_sigquit.sa_mask);
+	if (sigaction(SIGQUIT, &sa_sigquit, NULL) < 0)
 	{
 		ft_putstr_fd("minishell: sigaction SIGQUIT failed\n", 2);
 		exit(EXIT_FAILURE);

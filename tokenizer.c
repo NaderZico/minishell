@@ -6,88 +6,91 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/27 15:12:33 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/21 20:08:07 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/07/13 13:03:14 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "minishell.h"
 
-static int	ft_isspace(char c)
+/*
+ * Handles unquoted words in the input.
+ * Extracts the word and adds it as a token.
+ */
+static t_error	handle_word(char *input, int *i, t_data *data)
 {
-	return (c == ' ' || c == '\t' || c == '\n'
-		|| c == '\v' || c == '\f' || c == '\r');
-}
+	int		start;
+	t_quote	quote;
+	char	*value;
 
-static char	quote_type_to_char(t_quote type)
-{
-	if (type == SINGLE_QUOTE)
-		return ('\'');
-	if (type == DOUBLE_QUOTE)
-		return ('"');
-	return (0);
-}
-
-static t_quote	update_quote_state(t_quote current, char c)
-{
-	if (c == '\'')
-		return (current == SINGLE_QUOTE ? NO_QUOTE : SINGLE_QUOTE);
-	if (c == '"')
-		return (current == DOUBLE_QUOTE ? NO_QUOTE : DOUBLE_QUOTE);
-	return (current);
-}
-
-static t_error	ensure_token_capacity(t_data *data)
-{
-	int	new_cap;
-
-	if (data->token_count < data->token_cap)
-		return (SUCCESS);
-	if (data->token_cap > 0)
-		new_cap = data->token_cap * 2;
-	else
-		new_cap = 16;
-	data->tokens = ft_realloc(
-		data->tokens,
-		data->token_cap * sizeof *data->tokens,
-		new_cap * sizeof *data->tokens
-	);
-	data->token_cap = new_cap;
-	return (SUCCESS);
-}
-
-static t_error	add_token(t_data *data, char *value,
-				t_token_type type, t_quote quote)
-{
-	if (ensure_token_capacity(data) != SUCCESS)
-		return (ERR_MALLOC);
-	if (type != WORD && !value)
+	start = *i;
+	quote = NO_QUOTE;
+	while (input[*i])
 	{
-		if (type == PIPE)
-			value = ft_strdup("|");
-		else if (type == REDIR_IN)
-			value = ft_strdup("<");
-		else if (type == REDIR_OUT)
-			value = ft_strdup(">");
-		else if (type == REDIR_APPEND)
-			value = ft_strdup(">>");
-		else if (type == REDIR_HEREDOC)
-			value = ft_strdup("<<");
-		if (!value)
-			return (ERR_MALLOC);
+		if (quote == NO_QUOTE && (ft_isspace(input[*i]) || ft_strchr("|<>",
+					input[*i])))
+			break ;
+		if ((input[*i] == '\'' || input[*i] == '"') && quote == NO_QUOTE)
+			quote = update_quote_state(quote, input[*i]);
+		else if (input[*i] == quote_type_to_char(quote))
+			quote = update_quote_state(quote, input[*i]);
+		(*i)++;
 	}
-	data->tokens[data->token_count++] =
-		(t_token){value, type, quote};
-	return (SUCCESS);
+	value = ft_substr(input, start, *i - start);
+	if (!value)
+		return (ERR_MALLOC);
+	return (add_token(data, value, WORD, NO_QUOTE));
 }
 
+/*
+ * Handles redirection operators (<, >, <<, >>) in the input.
+ * Adds the appropriate redirection token.
+ */
+static t_error	handle_redirection(char *input, int *i, t_data *data)
+{
+	t_token_type	type;
+
+	if (input[*i] == '<' && input[*i + 1] == '<')
+	{
+		type = REDIR_HEREDOC;
+		(*i) += 2;
+	}
+	else if (input[*i] == '<')
+	{
+		type = REDIR_IN;
+		(*i) += 1;
+	}
+	else if (input[*i] == '>' && input[*i + 1] == '>')
+	{
+		type = REDIR_APPEND;
+		(*i) += 2;
+	}
+	else if (input[*i] == '>')
+	{
+		type = REDIR_OUT;
+		(*i) += 1;
+	}
+	else
+		return (ERR_SYNTAX);
+	return (add_token(data, NULL, type, NO_QUOTE));
+}
+
+/*
+ * Handles quoted substrings in the input.
+ * Extracts the quoted value and adds it as a token.
+ * Returns an error if quotes are not terminated.
+ */
 static t_error	handle_quotes(char *input, int *i, t_data *data)
 {
 	t_quote	quote_type;
 	int		start;
 	char	*value;
 
-	quote_type = (input[*i] == '\'') ? SINGLE_QUOTE : DOUBLE_QUOTE;
-	start = ++(*i);
+	if (input[*i] == '\'')
+		quote_type = SINGLE_QUOTE;
+	else
+		quote_type = DOUBLE_QUOTE;
+	start = *i + 1;
+	(*i)++;
 	while (input[*i] && input[*i] != quote_type_to_char(quote_type))
 		(*i)++;
 	if (!input[*i])
@@ -103,77 +106,10 @@ static t_error	handle_quotes(char *input, int *i, t_data *data)
 	return (add_token(data, value, WORD, quote_type));
 }
 
-static t_error	handle_word(char *input, int *i, t_data *data)
-{
-	int		start;
-	t_quote	quote;
-	char	*value;
-
-	start = *i;
-	quote = NO_QUOTE;
-	while (input[*i]
-		&& ((quote != NO_QUOTE)
-		|| (!ft_isspace(input[*i])
-		&& !ft_strchr("|<>", input[*i]))))
-	{
-		if ((input[*i] == '\'' || input[*i] == '"')
-			&& quote == NO_QUOTE)
-			quote = update_quote_state(quote, input[*i]);
-		else if (input[*i] == quote_type_to_char(quote))
-			quote = update_quote_state(quote, input[*i]);
-		(*i)++;
-	}
-	value = ft_substr(input, start, *i - start);
-	if (!value)
-		return (ERR_MALLOC);
-	return (add_token(data, value, WORD, NO_QUOTE));
-}
-
-static t_error	handle_pipe(char *input, int *i, t_data *data)
-{
-	char	*pipe_str;
-	t_error	err;
-
-	(void)input;
-	pipe_str = ft_strdup("|");
-	if (!pipe_str)
-		return (ERR_MALLOC);
-	err = add_token(data, pipe_str, PIPE, NO_QUOTE);
-	if (err != SUCCESS)
-		free(pipe_str);
-	(*i)++;
-	return (err);
-}
-
-static t_error	handle_redirection(char *input, int *i, t_data *data)
-{
-	t_token_type	type;
-
-	if (input[*i] == '<')
-	{
-		(*i)++;
-		if (input[*i] == '<')
-		{
-			(*i)++;
-			type = REDIR_HEREDOC;
-		}
-		else
-			type = REDIR_IN;
-	}
-	else
-	{
-		(*i)++;
-		if (input[*i] == '>')
-		{
-			(*i)++;
-			type = REDIR_APPEND;
-		}
-		else
-			type = REDIR_OUT;
-	}
-	return (add_token(data, NULL, type, NO_QUOTE));
-}
-
+/*
+ * Tokenizes the input string into tokens for the shell.
+ * Iterates through the input and delegates to handlers for each token type.
+ */
 t_error	tokenize_input(char *input, t_data *data)
 {
 	int		i;
@@ -189,7 +125,10 @@ t_error	tokenize_input(char *input, t_data *data)
 		else if (input[i] == '\'' || input[i] == '"')
 			err = handle_quotes(input, &i, data);
 		else if (input[i] == '|')
-			err = handle_pipe(input, &i, data);
+		{
+			i++;
+			err = add_token(data, NULL, PIPE, NO_QUOTE);
+		}
 		else if (input[i] == '<' || input[i] == '>')
 			err = handle_redirection(input, &i, data);
 		else

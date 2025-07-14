@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/28 13:33:37 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/05/24 18:38:34 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/07/11 16:32:53 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -85,13 +85,14 @@ void	append_char(char **buf, size_t *cap, size_t *len, char c)
 		*buf = ft_realloc(*buf, *cap, *cap * 2);
 		*cap *= 2;
 	}
-	(*buf)[(*len)++] = c;
+	(*buf)[*len] = c;
+	*len = *len + 1;
 	(*buf)[*len] = '\0';
 }
 
 void	handle_error(t_error err, t_data *data, char *context)
 {
-		const char *tok_val = data->tokens[data->error_pos].value;
+	const char *tok_val = data->tokens[data->error_pos].value;
 
 	if (err == ERR_SYNTAX)
 	{
@@ -115,5 +116,8 @@ void	handle_error(t_error err, t_data *data, char *context)
 		else
 			ft_putendl_fd("unknown error", STDERR_FILENO);
 	}
-	data->last_status = (err == ERR_SIGINT) ? 130 : err;
+	if (err == ERR_SIGINT)
+		data->last_status = 130;
+	else
+		data->last_status = err;
 }
