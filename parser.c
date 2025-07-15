@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/24 17:55:32 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/07/11 16:26:44 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/07/15 17:53:01 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -55,36 +55,47 @@ static t_error	add_redirection(t_command *cmd, t_data *data, int *i)
 	return (SUCCESS);
 }
 
+static t_error	parse_command(t_command *cmd, t_data *data, int *token_i)
+{
+	t_error	err;
+
+	err = SUCCESS;
+	*cmd = (t_command){NULL, NULL, 0, 0, 0};
+	while (*token_i < data->token_count && data->tokens[*token_i].type != PIPE)
+	{
+		if (data->tokens[*token_i].type >= REDIR_IN)
+			err = add_redirection(cmd, data, token_i);
+		else
+		{
+			cmd->args = ft_extend_arr(cmd->args,
+					data->tokens[(*token_i)++].value);
+			err = SUCCESS;
+		}
+		if (err != SUCCESS)
+			return (err);
+	}
+	return (SUCCESS);
+}
+
 t_error	parse_tokens(t_data *data)
 {
 	int		cmd_idx;
-	int		i;
+	int		token_i;
 	t_error	err;
 
-	free_commands(data);
 	cmd_idx = 0;
-	i = 0;
-	while (i < data->token_count)
+	token_i = 0;
+	free_commands(data);
+	while (token_i < data->token_count)
 	{
 		err = ensure_command_capacity(data, cmd_idx);
 		if (err != SUCCESS)
 			return (err);
-		data->commands[cmd_idx] = (t_command){NULL, NULL, 0, 0, 0};
-		while (i < data->token_count && data->tokens[i].type != PIPE)
-		{
-			if (data->tokens[i].type >= REDIR_IN)
-				err = add_redirection(&data->commands[cmd_idx], data, &i);
-			else
-			{
-				data->commands[cmd_idx].args = ft_extend_arr(data->commands[cmd_idx].args,
-						data->tokens[i++].value);
-				err = SUCCESS;
-			}
-			if (err != SUCCESS)
-				return (err);
-		}
-		if (i < data->token_count && data->tokens[i].type == PIPE)
-			i++;
+		err = parse_command(&data->commands[cmd_idx], data, &token_i);
+		if (err != SUCCESS)
+			return (err);
+		if (token_i < data->token_count && data->tokens[token_i].type == PIPE)
+			token_i++;
 		cmd_idx++;
 	}
 	data->cmd_count = cmd_idx;
