@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/24 17:55:32 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/07/15 17:53:01 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/07/15 18:43:39 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,7 +24,7 @@ static t_error	ensure_command_capacity(t_data *data, int cmd_idx)
 	else
 		new_cap = 16;
 	data->commands = ft_realloc(data->commands, data->cmd_cap
-			* sizeof *data->commands, new_cap * sizeof *data->commands);
+			* sizeof * data->commands, new_cap * sizeof * data->commands);
 	i = data->cmd_cap;
 	while (i < new_cap)
 	{
@@ -45,8 +45,8 @@ static t_error	add_redirection(t_command *cmd, t_data *data, int *i)
 		return (ERR_SYNTAX);
 	}
 	cmd->redirs = ft_realloc(cmd->redirs, cmd->redir_count
-			* sizeof *cmd->redirs, (cmd->redir_count + 1)
-			* sizeof *cmd->redirs);
+			* sizeof * cmd->redirs, (cmd->redir_count + 1)
+			* sizeof * cmd->redirs);
 	file = ft_strdup(data->tokens[*i + 1].value);
 	if (!file)
 		return (ERR_MALLOC);

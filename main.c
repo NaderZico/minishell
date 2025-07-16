@@ -108,7 +108,7 @@ int	main(int argc, char **argv, char **envp)
 					else
 					{
 						// debug_print_commands(&data);
-						/* 4) execute_commands(&data); */
+						// execute_commands(&data);
 					}
 				}
 			}

@@ -6,7 +6,7 @@
 /*   By: nakhalil <nakhalil@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/25 19:32:58 by nakhalil          #+#    #+#             */
-/*   Updated: 2025/07/14 13:21:25 by nakhalil         ###   ########.fr       */
+/*   Updated: 2025/07/16 11:29:41 by nakhalil         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -37,7 +37,6 @@ void	setup_signals(void)
 		ft_putstr_fd("minishell: sigaction SIGINT failed\n", 2);
 		exit(EXIT_FAILURE);
 	}
-
 	sa_sigquit.sa_handler = SIG_IGN;
 	sa_sigquit.sa_flags = 0;
 	sigemptyset(&sa_sigquit.sa_mask);
